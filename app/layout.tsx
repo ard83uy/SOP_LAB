@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Fidelidade",
-  description: "B2B SaaS para gestão operacional de restaurantes",
+  title: "SOP",
+  description: "Gestão operacional de restaurantes (Back-of-House)",
 };
 
 export default function RootLayout({

@@ -1,0 +1,124 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  LINE_COOK
+  PREP_KITCHEN
+}
+
+enum UserStatus {
+  ONBOARDING
+  ACTIVE
+  INACTIVE
+}
+
+model Tenant {
+  id             String          @id @default(uuid()) @db.Uuid
+  name           String
+  slug           String          @unique
+  active_modules Json            @default("[\"handover\", \"production\"]")
+  max_employees  Int             @default(10)
+  created_at     DateTime        @default(now())
+
+  users          User[]
+  stations       Station[]
+  shiftHandovers ShiftHandover[]
+  prepItems      PrepItem[]
+  productionLogs ProductionLog[]
+}
+
+model User {
+  id             String          @id @default(uuid()) @db.Uuid
+  clerk_user_id  String          @unique
+  tenant_id      String          @db.Uuid
+  role           UserRole
+  name           String
+  email          String
+  status         UserStatus      @default(ONBOARDING)
+  created_at     DateTime        @default(now())
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  shiftHandovers ShiftHandover[]
+  productionLogs ProductionLog[]
+}
+
+model Station {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenant_id      String          @db.Uuid
+  name           String
+  created_at     DateTime        @default(now())
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  prepItems      PrepItem[]
+  shiftHandovers ShiftHandover[]
+
+  @@unique([tenant_id, name])
+}
+
+model PrepItem {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenant_id      String          @db.Uuid
+  station_id     String          @db.Uuid
+  name           String
+  unit           String
+  target_quantity Float
+  created_at     DateTime        @default(now())
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  station        Station         @relation(fields: [station_id], references: [id], onDelete: Cascade)
+  handoverItemCounts HandoverItemCount[]
+  productionLogs ProductionLog[]
+
+  @@unique([station_id, name])
+}
+
+model ShiftHandover {
+  id             String          @id @default(uuid()) @db.Uuid
+  tenant_id      String          @db.Uuid
+  user_id        String          @db.Uuid
+  station_id     String          @db.Uuid
+  created_at     DateTime        @default(now())
+
+  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [user_id], references: [id])
+  station        Station         @relation(fields: [station_id], references: [id])
+  items          HandoverItemCount[]
+  productionLogs ProductionLog[]
+}
+
+model HandoverItemCount {
+  id                 String          @id @default(uuid()) @db.Uuid
+  shift_handover_id  String          @db.Uuid
+  prep_item_id       String          @db.Uuid
+  actual_quantity    Float
+
+  shiftHandover      ShiftHandover   @relation(fields: [shift_handover_id], references: [id], onDelete: Cascade)
+  prepItem           PrepItem        @relation(fields: [prep_item_id], references: [id])
+
+  @@unique([shift_handover_id, prep_item_id])
+}
+
+model ProductionLog {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenant_id          String          @db.Uuid
+  prep_item_id       String          @db.Uuid
+  user_id            String          @db.Uuid
+  shift_handover_id  String          @db.Uuid
+  produced_quantity  Float
+  created_at         DateTime        @default(now())
+
+  tenant             Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  prepItem           PrepItem        @relation(fields: [prep_item_id], references: [id])
+  user               User            @relation(fields: [user_id], references: [id])
+  shiftHandover      ShiftHandover   @relation(fields: [shift_handover_id], references: [id])
+}
