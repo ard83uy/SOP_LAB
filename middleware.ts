@@ -4,6 +4,13 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 const isPublicRoute = createRouteMatcher(["/", "/sign-in(.*)", "/sign-up(.*)", "/api/health"]);
 
 export default clerkMiddleware(async (auth, request) => {
+  const { nextUrl } = request;
+  
+  // Bypass explícito para o healthcheck do Railway
+  if (nextUrl.pathname === "/api/health") {
+    return;
+  }
+
   if (!isPublicRoute(request)) {
     await auth.protect();
   }
