@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # Ignorar pastas Pesadas
+=======
+# Ignorar pastas de sistema e do Agent que são pesadas
+>>>>>>> beta
 .agent
 .agents
 .gemini
