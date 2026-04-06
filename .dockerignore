@@ -1,0 +1,21 @@
+# Ignorar pastas Pesadas
+.agent
+.agents
+.gemini
+_agents
+_agent
+skills
+.git
+node_modules
+.next
+out
+build
+
+# Ignorar logs e arquivos temporários
+*.log
+.DS_Store
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
