@@ -13,10 +13,11 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error) {
+    console.error("Healthcheck Database Error:", error);
     return NextResponse.json(
       {
         status: "unhealthy",
-        error: "Database connection failed",
+        error: error instanceof Error ? error.message : "Database connection failed",
       },
       { status: 503 }
     );
