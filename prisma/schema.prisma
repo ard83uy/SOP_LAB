@@ -12,13 +12,15 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  LINE_COOK
+  MANAGER
+  STATION_LEADER
   PREP_KITCHEN
+  STAFF
 }
 
 enum UserStatus {
-  ONBOARDING
   ACTIVE
+  ONBOARDING
   INACTIVE
 }
 
@@ -26,7 +28,7 @@ model Tenant {
   id             String          @id @default(uuid()) @db.Uuid
   name           String
   slug           String          @unique
-  active_modules Json            @default("[\"handover\", \"production\"]")
+  active_modules Json            @default("{}") // Ex: {"production": true, "inventory": true}
   max_employees  Int             @default(10)
   created_at     DateTime        @default(now())
 
@@ -35,6 +37,7 @@ model Tenant {
   shiftHandovers ShiftHandover[]
   prepItems      PrepItem[]
   productionLogs ProductionLog[]
+  prepItemRequests PrepItemRequest[]
 }
 
 model User {
@@ -48,8 +51,9 @@ model User {
   created_at     DateTime        @default(now())
 
   tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  shiftHandovers ShiftHandover[]
-  productionLogs ProductionLog[]
+  shiftHandovers   ShiftHandover[]
+  productionLogs   ProductionLog[]
+  prepItemRequests PrepItemRequest[]
 }
 
 model Station {
@@ -58,9 +62,10 @@ model Station {
   name           String
   created_at     DateTime        @default(now())
 
-  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  prepItems      PrepItem[]
-  shiftHandovers ShiftHandover[]
+  tenant           Tenant            @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  prepItems        PrepItem[]
+  shiftHandovers   ShiftHandover[]
+  prepItemRequests PrepItemRequest[]
 
   @@unique([tenant_id, name])
 }
@@ -68,18 +73,19 @@ model Station {
 model PrepItem {
   id             String          @id @default(uuid()) @db.Uuid
   tenant_id      String          @db.Uuid
-  station_id     String          @db.Uuid
   name           String
   unit           String
   target_quantity Float
   created_at     DateTime        @default(now())
 
-  tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
-  station        Station         @relation(fields: [station_id], references: [id], onDelete: Cascade)
+  tenant         Tenant             @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  stations       Station[]
   handoverItemCounts HandoverItemCount[]
   productionLogs ProductionLog[]
+  dayTargets     PrepItemDayTarget[]
+  requestSource  PrepItemRequest?
 
-  @@unique([station_id, name])
+  @@unique([tenant_id, name], name: "tenantId_name")
 }
 
 model ShiftHandover {
@@ -121,4 +127,41 @@ model ProductionLog {
   prepItem           PrepItem        @relation(fields: [prep_item_id], references: [id])
   user               User            @relation(fields: [user_id], references: [id])
   shiftHandover      ShiftHandover   @relation(fields: [shift_handover_id], references: [id])
+}
+
+model PrepItemDayTarget {
+  id                 String          @id @default(uuid()) @db.Uuid
+  prep_item_id       String          @db.Uuid
+  day_of_week        Int             // 0-6
+  target_quantity    Float
+
+  prepItem           PrepItem        @relation(fields: [prep_item_id], references: [id], onDelete: Cascade)
+
+  @@unique([prep_item_id, day_of_week])
+}
+
+model PrepItemRequest {
+  id                 String          @id @default(uuid()) @db.Uuid
+  tenant_id          String          @db.Uuid
+  user_id            String          @db.Uuid
+  station_id         String          @db.Uuid
+  name               String
+  unit               String
+  note               String?
+  status             RequestStatus    @default(PENDING)
+  created_at         DateTime        @default(now())
+  
+  // Se aprovado, liga ao item criado
+  prep_item_id       String?         @unique @db.Uuid
+  
+  tenant             Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  user               User            @relation(fields: [user_id], references: [id])
+  station            Station         @relation(fields: [station_id], references: [id])
+  prepItem           PrepItem?       @relation(fields: [prep_item_id], references: [id])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

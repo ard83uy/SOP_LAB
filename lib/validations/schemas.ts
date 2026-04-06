@@ -34,3 +34,24 @@ export const submitProductionLogSchema = z.object({
   shift_handover_id: z.string().uuid(),
   produced_quantity: z.number().positive(),
 });
+
+export const upsertDayTargetsSchema = z.object({
+  targets: z.array(
+    z.object({
+      day_of_week: z.number().int().min(0).max(6),
+      target_quantity: z.number().min(0),
+    })
+  ).min(1),
+});
+
+export const createPrepItemRequestSchema = z.object({
+  station_id: z.string().uuid(),
+  name: z.string().min(2).max(100),
+  unit: z.string().min(1).max(20),
+  note: z.string().max(500).optional(),
+});
+
+export const reviewPrepItemRequestSchema = z.object({
+  action: z.enum(["APPROVED", "REJECTED"]),
+  target_quantity: z.number().positive().optional(),
+});

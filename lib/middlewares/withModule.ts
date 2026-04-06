@@ -19,8 +19,13 @@ export const withModule = (moduleName: string): Middleware => {
       return NextResponse.json({ error: "Tenant not found", code: "NOT_FOUND", status: 404 }, { status: 404 });
     }
 
-    const modules = tenant.active_modules as string[];
-    if (!modules || !modules.includes(moduleName)) {
+    const raw = tenant.active_modules;
+    // Support both array format ["handover"] and object format {"handover": true}
+    const isActive = Array.isArray(raw)
+      ? raw.includes(moduleName)
+      : typeof raw === "object" && raw !== null && (raw as Record<string, unknown>)[moduleName] === true;
+
+    if (!isActive) {
       req.logger.warn({ tenant_id, module: moduleName }, "Module not active for tenant");
       return NextResponse.json(
         { error: "Módulo não disponível no seu plano", code: "FORBIDDEN_MODULE", status: 403 },

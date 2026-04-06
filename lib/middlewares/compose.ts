@@ -20,15 +20,17 @@ export function compose(...middlewares: (Middleware | Function)[]) {
   return async (req: NextRequest, { params }: { params: any } = { params: {} }) => {
     const requestId = crypto.randomUUID();
     const reqLogger = logger.child({ request_id: requestId, url: req.url, method: req.method });
-    
+
     (req as AppRequest).ctx = {};
     (req as AppRequest).logger = reqLogger;
+
+    const resolvedParams = params instanceof Promise ? await params : params;
 
     const execute = async (index: number): Promise<NextResponse> => {
       if (index === middlewares.length - 1) {
         const handler = middlewares[index] as Function;
         try {
-          return await handler(req as AppRequest, { params });
+          return await handler(req as AppRequest, { params: resolvedParams });
         } catch (error: any) {
              reqLogger.error({ err: error, stack: error.stack }, "Unhandled Exception in handler");
              return NextResponse.json(

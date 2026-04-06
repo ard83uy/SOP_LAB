@@ -1,0 +1,10 @@
+{
+  "build": {
+    "buildCommand": "npx prisma generate && npm run build"
+  },
+  "deploy": {
+    "startCommand": "npm run start",
+    "healthcheckPath": "/api/health",
+    "restartPolicyType": "ON_FAILURE"
+  }
+}

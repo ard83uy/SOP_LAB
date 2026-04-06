@@ -11,13 +11,13 @@ export function withErrorHandler(handler: Function) {
       return await handler(req, { ...args[0], logger: reqLogger });
     } catch (error: any) {
       if (error instanceof ZodError) {
-        reqLogger.warn({ err: error, details: error.errors }, "Validation Error");
+        reqLogger.warn({ err: error, details: error.issues }, "Validation Error");
         return NextResponse.json(
           {
             error: "Validation failed",
             code: "VALIDATION_ERROR",
             status: 400,
-            details: error.errors,
+            details: error.issues,
           },
           { status: 400 }
         );

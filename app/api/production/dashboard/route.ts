@@ -5,6 +5,7 @@ import { withTenant } from "@/lib/middlewares/withTenant";
 import { withRole } from "@/lib/middlewares/withRole";
 import { withModule } from "@/lib/middlewares/withModule";
 import { prisma } from "@/lib/prisma";
+import { todayDowSP, formatSP } from "@/lib/timezone";
 
 async function getProductionDashboard(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
@@ -15,25 +16,39 @@ async function getProductionDashboard(req: AppRequest) {
 
   const dashboardStations = [];
 
+  const todayDow = todayDowSP();
+
   for (const station of stations) {
     const latestHandover = await prisma.shiftHandover.findFirst({
       where: { station_id: station.id, tenant_id },
       orderBy: { created_at: "desc" },
       include: {
         items: {
-          include: { prepItem: true }
+          include: { prepItem: { include: { dayTargets: true } as any } }
         }
       }
     });
 
     if (!latestHandover) continue;
 
+    const handover = latestHandover as any;
     const itemsToProduce = [];
 
-    for (const hc of latestHandover.items) {
-      const target = hc.prepItem.target_quantity;
+    const productionTotals = await prisma.productionLog.groupBy({
+      by: ["prep_item_id"],
+      where: { shift_handover_id: handover.id, tenant_id },
+      _sum: { produced_quantity: true },
+    });
+    const producedByItem: Record<string, number> = Object.fromEntries(
+      productionTotals.map((p: any) => [p.prep_item_id, p._sum.produced_quantity ?? 0])
+    );
+
+    for (const hc of handover.items) {
+      const dayTarget = hc.prepItem.dayTargets.find((dt: any) => dt.day_of_week === todayDow);
+      const target = dayTarget?.target_quantity ?? hc.prepItem.target_quantity;
       const actual = hc.actual_quantity;
-      const to_produce = Math.max(0, target - actual);
+      const already_produced = producedByItem[hc.prepItem.id] ?? 0;
+      const to_produce = Math.max(0, target - actual - already_produced);
 
       if (to_produce > 0) {
         itemsToProduce.push({
@@ -41,9 +56,12 @@ async function getProductionDashboard(req: AppRequest) {
           name: hc.prepItem.name,
           unit: hc.prepItem.unit,
           target_quantity: target,
+          default_target: hc.prepItem.target_quantity,
+          is_day_specific: !!dayTarget,
           actual_quantity: actual,
+          already_produced,
           to_produce,
-          shift_handover_id: latestHandover.id
+          shift_handover_id: handover.id,
         });
       }
     }
@@ -56,7 +74,7 @@ async function getProductionDashboard(req: AppRequest) {
     }
   }
 
-  return NextResponse.json({ stations: dashboardStations });
+  return NextResponse.json({ stations: dashboardStations, server_time: formatSP() });
 }
 
-export const GET = compose(withAuth, withTenant, withRole(["ADMIN", "PREP_KITCHEN"]), withModule("production"), getProductionDashboard);
+export const GET = compose(withAuth, withTenant, withRole(["ADMIN", "MANAGER", "PREP_KITCHEN"]), withModule("production"), getProductionDashboard);
