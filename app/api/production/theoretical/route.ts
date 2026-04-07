@@ -56,26 +56,56 @@ async function getTheoreticalHandler(req: AppRequest) {
       continue;
     }
 
-    const handoverDateLabel = dateLabelSP(latestHandover.created_at);
+    const handoverDateLabel = latestHandover ? dateLabelSP(latestHandover.created_at) : null;
     const handoverIsToday = handoverDateLabel === todayLabel;
 
-    // Calculate days since last handover
-    const diffMs = nowSP().getTime() - new Date(latestHandover.created_at).getTime();
-    const days_since = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    // We only want to show items that DON'T have a count TODAY
+    // If a station was partially counted today, we only show the uncounted items here.
+    
+    // 1. Find all items counted today in this station
+    const itemsCountedToday = await prisma.handoverItemCount.findMany({
+      where: {
+        prepItem: { stations: { some: { id: station.id } } },
+        shiftHandover: {
+          station_id: station.id,
+          created_at: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0)),
+          },
+        },
+      },
+      select: { prep_item_id: true },
+    });
+    
+    // Better today check using the same timezone logic
+    const todayHandovers = await prisma.shiftHandover.findMany({
+      where: { 
+        station_id: station.id,
+        tenant_id,
+        created_at: { gte: new Date(new Date().getTime() - 24 * 60 * 60 * 1000) } // Safety margin
+      }
+    });
 
-    const countByItem: Record<string, number> = Object.fromEntries(
-      latestHandover.items.map((hc: any) => [hc.prep_item_id, hc.actual_quantity])
-    );
+    const actuallyTodayIds = todayHandovers
+      .filter((h: any) => dateLabelSP(h.created_at) === todayLabel)
+      .map((h: any) => h.id);
+
+    const countedTodayIds = await prisma.handoverItemCount.findMany({
+      where: { shift_handover_id: { in: actuallyTodayIds } },
+      select: { prep_item_id: true }
+    }).then((items: { prep_item_id: string }[]) => new Set(items.map(i => i.prep_item_id)));
 
     const items = station.prepItems
+      .filter((item: any) => !countedTodayIds.has(item.id)) // Only uncounted items
       .map((item: any) => {
         const dayTarget = item.dayTargets?.find((dt: any) => dt.day_of_week === todayDow);
         const effective_target = dayTarget?.target_quantity ?? item.target_quantity;
-        const last_count = countByItem[item.id] ?? null;
-
-        // If item was never counted in any handover, assume 0
-        const baseline = last_count ?? 0;
-        const theoretical_need = effective_target - baseline;
+        
+        // Since it wasn't counted today, we don't have a reliable baseline.
+        // We show the full target as the "Theoretical Need".
+        
+        const last_count = (latestHandover as any)?.items?.find((i: any) => i.prep_item_id === item.id)?.actual_quantity ?? null;
+        const diffMs = latestHandover ? nowSP().getTime() - new Date(latestHandover.created_at).getTime() : 0;
+        const days_since = latestHandover ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) : null;
 
         return {
           prep_item_id: item.id,
@@ -83,15 +113,15 @@ async function getTheoreticalHandler(req: AppRequest) {
           unit: item.unit,
           effective_target,
           last_count,
-          last_count_at: latestHandover.created_at,
+          last_count_at: latestHandover?.created_at ?? null,
           days_since,
-          theoretical_need,
+          theoretical_need: effective_target,
         };
       })
       .filter((i: any) => i.theoretical_need > 0);
 
     if (items.length > 0) {
-      result.push({ station_name: station.name, items, handover_is_today: handoverIsToday });
+      result.push({ station_name: station.name, items, handover_is_today: false });
     }
   }
 

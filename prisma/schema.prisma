@@ -93,6 +93,7 @@ model ShiftHandover {
   tenant_id      String          @db.Uuid
   user_id        String          @db.Uuid
   station_id     String          @db.Uuid
+  note           String?
   created_at     DateTime        @default(now())
 
   tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)

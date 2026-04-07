@@ -58,7 +58,7 @@ async function listHandoversHandler(req: AppRequest) {
 // ── POST /api/handovers ───────────────────────────────────────────────────────
 
 async function submitHandoverHandler(req: AppRequest) {
-  const { station_id, items } = req.ctx.parsedBody;
+  const { station_id, note, items } = req.ctx.parsedBody;
   const tenant_id = req.ctx.tenant_id!;
   const user_id = req.ctx.user_id!;
 
@@ -87,6 +87,7 @@ async function submitHandoverHandler(req: AppRequest) {
         tenant_id,
         user_id,
         station_id,
+        note: note ?? null,
         items: {
           create: items.map((i: any) => ({
             prep_item_id: i.prep_item_id,

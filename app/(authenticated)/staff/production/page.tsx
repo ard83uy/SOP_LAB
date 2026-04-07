@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChefHat, CheckCircle2, ClipboardList, History, TrendingUp } from "lucide-react";
+import { CalendarDays, ChefHat, CheckCircle2, ClipboardList, History, TrendingUp } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -70,6 +70,27 @@ type ProductionGroup = {
     time: string;
   }[];
 };
+
+// ── Date helpers ─────────────────────────────────────────────────────────────
+
+/** Returns YYYY-MM-DD in São Paulo timezone, with optional day offset */
+function spDateISO(offset = 0): string {
+  const d = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  d.setDate(d.getDate() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Converts YYYY-MM-DD to DD/MM/YYYY (API format) */
+function isoToLabel(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+/** Formats YYYY-MM-DD for display: "05/04/2025" */
+function isoToDisplay(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 // ── Tab Bar ───────────────────────────────────────────────────────────────────
 
@@ -147,6 +168,72 @@ function ConfirmProduceDialog({
   );
 }
 
+// ── Date Picker Modal ─────────────────────────────────────────────────────────
+
+function DatePickerModal({
+  selectedDate,
+  onSelect,
+  onClose,
+}: {
+  selectedDate: string;
+  onSelect: (date: string) => void;
+  onClose: () => void;
+}) {
+  const [draft, setDraft] = useState(selectedDate);
+  const today = spDateISO(0);
+  const yesterday = spDateISO(-1);
+  const minDate = spDateISO(-30);
+
+  return (
+    <Dialog open onOpenChange={(v) => !v && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Selecionar data da contagem</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Escolha o dia da contagem de estoque que será usado como base para produção.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setDraft(yesterday)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                draft === yesterday
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Ontem · {isoToDisplay(yesterday)}
+            </button>
+            <button
+              onClick={() => setDraft(today)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition-colors ${
+                draft === today
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Hoje · {isoToDisplay(today)}
+            </button>
+          </div>
+          <input
+            type="date"
+            value={draft}
+            min={minDate}
+            max={today}
+            onChange={(e) => setDraft(e.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          />
+        </div>
+        <DialogFooter className="gap-2 pt-2">
+          <Button variant="outline" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => { onSelect(draft); onClose(); }}>Aplicar</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Production Card ───────────────────────────────────────────────────────────
 
 function ProductionCard({
@@ -158,7 +245,8 @@ function ProductionCard({
   isCompleting: boolean;
   onRequest: (qty: number) => void;
 }) {
-  const [val, setVal] = useState(item.to_produce.toString());
+  const toProduce = parseFloat(item.to_produce.toFixed(3));
+  const [val, setVal] = useState(toProduce.toString());
 
   return (
     <div className="relative">
@@ -174,10 +262,10 @@ function ProductionCard({
             <h3 className="font-bold text-2xl md:text-3xl text-foreground">{item.name}</h3>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <div className="bg-destructive/10 text-destructive font-bold px-4 py-1.5 rounded-lg text-lg">
-                Faltam: {item.to_produce} {item.unit}
+                Faltam: {toProduce} {item.unit}
               </div>
               <p className="text-muted-foreground text-base font-medium">
-                Atual: {item.actual_quantity} / Utilização média: {item.target_quantity}
+                Atual: {parseFloat(item.actual_quantity.toFixed(3))} / Utilização média: {parseFloat(item.target_quantity.toFixed(3))}
                 {item.is_day_specific && (
                   <span className="text-amber-600 ml-1 text-sm">(dia específico)</span>
                 )}
@@ -224,11 +312,13 @@ function ProductionDashboard() {
   const queryClient = useQueryClient();
   const [confirmState, setConfirmState] = useState<{ item: ProductionItem; qty: number } | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(() => spDateISO(-1));
+  const [dateModalOpen, setDateModalOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["production-dashboard"],
+    queryKey: ["production-dashboard", selectedDate],
     queryFn: async () => {
-      const res = await fetch("/api/production/dashboard");
+      const res = await fetch(`/api/production/dashboard?date=${isoToLabel(selectedDate)}`);
       if (!res.ok) throw new Error("Falha ao carregar dashboard de produção");
       return res.json();
     },
@@ -311,10 +401,26 @@ function ProductionDashboard() {
 
   const stations = data?.stations || [];
   const serverTime = data?.server_time;
+  const today = spDateISO(0);
+  const yesterday = spDateISO(-1);
+  const isYesterday = selectedDate === yesterday;
+  const isToday = selectedDate === today;
+  const dateLabel = isYesterday ? "Ontem" : isToday ? "Hoje" : isoToDisplay(selectedDate);
+
+  const dateSelectorButton = (
+    <button
+      onClick={() => setDateModalOpen(true)}
+      className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+    >
+      <CalendarDays className="w-4 h-4" />
+      <span>Contagem de <strong className="text-foreground">{dateLabel} · {isoToDisplay(selectedDate)}</strong></span>
+    </button>
+  );
 
   if (stations.length === 0) {
     return (
       <>
+        <div className="mb-4">{dateSelectorButton}</div>
         <div className="flex flex-col items-center justify-center text-center gap-6 py-12">
           <div className="bg-green-100 dark:bg-green-900/30 p-8 rounded-full">
             <CheckCircle2 className="w-20 h-20 text-green-600 dark:text-green-400" />
@@ -327,15 +433,25 @@ function ProductionDashboard() {
           </div>
         </div>
         <TheoreticalNeeds />
+        {dateModalOpen && (
+          <DatePickerModal
+            selectedDate={selectedDate}
+            onSelect={setSelectedDate}
+            onClose={() => setDateModalOpen(false)}
+          />
+        )}
       </>
     );
   }
 
   return (
     <>
-      {serverTime && (
-        <p className="text-sm text-muted-foreground mb-6">Horário do servidor: {serverTime}</p>
-      )}
+      <div className="flex items-center justify-between mb-6">
+        {dateSelectorButton}
+        {serverTime && (
+          <p className="text-xs text-muted-foreground">Servidor: {serverTime}</p>
+        )}
+      </div>
 
       <div className="space-y-12 pb-16">
         {stations.map((station: any, sIdx: number) => (
@@ -366,6 +482,14 @@ function ProductionDashboard() {
           qty={confirmState.qty}
           onConfirm={handleConfirm}
           onCancel={() => setConfirmState(null)}
+        />
+      )}
+
+      {dateModalOpen && (
+        <DatePickerModal
+          selectedDate={selectedDate}
+          onSelect={setSelectedDate}
+          onClose={() => setDateModalOpen(false)}
         />
       )}
     </>
@@ -404,7 +528,7 @@ function TheoreticalNeeds() {
         <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
         <h2 className="text-lg font-bold text-amber-700 dark:text-amber-400">Necessário Teórico</h2>
         <span className="text-xs text-muted-foreground font-normal ml-1">
-          — estimativa com base na última contagem
+          — Valores estimados. Não houve contagem
         </span>
       </div>
 
@@ -418,11 +542,11 @@ function TheoreticalNeeds() {
             if (noCount) {
               countLabel = "sem contagem registrada";
             } else if (item.days_since === 0) {
-              countLabel = `última contagem hoje: ${item.last_count} ${item.unit}`;
+              countLabel = `última contagem hoje: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
             } else if (item.days_since === 1) {
-              countLabel = `última contagem ontem: ${item.last_count} ${item.unit}`;
+              countLabel = `última contagem ontem: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
             } else {
-              countLabel = `última contagem há ${item.days_since} dias: ${item.last_count} ${item.unit}`;
+              countLabel = `última contagem há ${item.days_since} dias: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
             }
 
             return (
@@ -440,7 +564,7 @@ function TheoreticalNeeds() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="font-extrabold text-lg text-amber-700 dark:text-amber-400">
-                      ~{item.theoretical_need} {item.unit}
+                      ~{parseFloat(item.theoretical_need.toFixed(3))} {item.unit}
                     </p>
                     {stale && item.days_since !== null && item.days_since > 0 && (
                       <p className="text-[10px] text-amber-600/70 dark:text-amber-500/70">estimado</p>
@@ -518,7 +642,7 @@ function HistoryHandovers() {
                       >
                         <span>{item.name}</span>
                         <span className="font-medium text-foreground">
-                          {item.actual_quantity} {item.unit}
+                          {parseFloat(item.actual_quantity.toFixed(3))} {item.unit}
                         </span>
                       </li>
                     ))}

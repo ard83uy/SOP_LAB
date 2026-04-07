@@ -15,6 +15,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -24,6 +25,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -49,6 +51,7 @@ export default function HandoverPage() {
   const [successData, setSuccessData] = useState<any>(null);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestForm, setRequestForm] = useState({ name: "", unit: "kg", note: "" });
+  const [reviewState, setReviewState] = useState<{ items: { id: string; name: string; unit: string; qty: number }[]; comment: string } | null>(null);
 
   const { data: stations, isLoading: loadingStations } = useQuery({
     queryKey: ["stations"],
@@ -87,13 +90,14 @@ export default function HandoverPage() {
   }
 
   const mutation = useMutation({
-    mutationFn: async (data: z.infer<typeof submitCountSchema>) => {
+    mutationFn: async ({ filledItems, comment }: { filledItems: { prep_item_id: string; actual_quantity: number }[]; comment: string }) => {
       const res = await fetch("/api/handovers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           station_id: selectedStation.id,
-          items: data.items.map(i => ({ ...i, actual_quantity: Number(i.actual_quantity) })),
+          note: comment.trim() || undefined,
+          items: filledItems,
         }),
       });
       if (!res.ok) {
@@ -115,6 +119,7 @@ export default function HandoverPage() {
         }
       }
       setSuccessData({ missing });
+      setReviewState(null);
       toast.success("Contagem salva com sucesso!");
     },
     onError: (error) => {
@@ -149,7 +154,27 @@ export default function HandoverPage() {
   });
 
   function onSubmit(values: z.infer<typeof submitCountSchema>) {
-    mutation.mutate(values);
+    const filledItems = values.items
+      .filter(i => i.actual_quantity !== ("" as any) && i.actual_quantity !== null && i.actual_quantity !== undefined)
+      .map(i => ({ prep_item_id: i.prep_item_id, actual_quantity: Number(i.actual_quantity) }));
+
+    if (filledItems.length === 0) {
+      toast.error("Preencha a quantidade de pelo menos um insumo");
+      return;
+    }
+
+    const reviewItems = filledItems.map(i => {
+      const info = prepItems.find((p: any) => p.id === i.prep_item_id);
+      return { id: i.prep_item_id, name: info?.name ?? i.prep_item_id, unit: info?.unit ?? "", qty: i.actual_quantity };
+    });
+
+    setReviewState({ items: reviewItems, comment: "" });
+  }
+
+  function confirmSubmit() {
+    if (!reviewState) return;
+    const filledItems = reviewState.items.map(i => ({ prep_item_id: i.id, actual_quantity: i.qty }));
+    mutation.mutate({ filledItems, comment: reviewState.comment });
   }
 
   const restart = () => {
@@ -357,6 +382,54 @@ export default function HandoverPage() {
             </div>
           </form>
         </Form>
+      )}
+
+      {reviewState && (
+        <Dialog open onOpenChange={(v) => !v && setReviewState(null)}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-lg leading-snug">
+                Confira sua contagem, verifique que tudo está correto e envie para produção
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3 mt-1">
+              <ul className="divide-y divide-border rounded-xl border overflow-hidden">
+                {reviewState.items.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between px-4 py-3">
+                    <span className="font-medium text-base">{item.name}</span>
+                    <span className="font-bold text-lg tabular-nums">
+                      {parseFloat(item.qty.toFixed(3))} <span className="text-sm font-normal text-muted-foreground">{item.unit}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-muted-foreground">Comentário (opcional)</label>
+                <Textarea
+                  placeholder="Ex: Estoque baixo de frango, pedir reposição amanhã..."
+                  className="resize-none min-h-[80px] text-base"
+                  value={reviewState.comment}
+                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setReviewState((s) => s ? { ...s, comment: e.target.value } : s)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" onClick={() => setReviewState(null)}>
+                Voltar e editar
+              </Button>
+              <Button
+                className="font-bold"
+                onClick={confirmSubmit}
+                disabled={mutation.isPending}
+              >
+                {mutation.isPending ? "Enviando..." : "Enviar para produção"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

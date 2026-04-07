@@ -5,10 +5,17 @@ import { withTenant } from "@/lib/middlewares/withTenant";
 import { withRole } from "@/lib/middlewares/withRole";
 import { withModule } from "@/lib/middlewares/withModule";
 import { prisma } from "@/lib/prisma";
-import { todayDowSP, formatSP } from "@/lib/timezone";
+import { todayDowSP, formatSP, dateLabelSP, nowSP } from "@/lib/timezone";
+
+function yesterdayLabelSP(): string {
+  const d = nowSP();
+  d.setDate(d.getDate() - 1);
+  return dateLabelSP(d);
+}
 
 async function getProductionDashboard(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
+  const targetLabel = req.nextUrl.searchParams.get("date") ?? yesterdayLabelSP();
 
   const stations = await prisma.station.findMany({
     where: { tenant_id }
@@ -19,8 +26,13 @@ async function getProductionDashboard(req: AppRequest) {
   const todayDow = todayDowSP();
 
   for (const station of stations) {
-    const latestHandover = await prisma.shiftHandover.findFirst({
-      where: { station_id: station.id, tenant_id },
+    // Fetch recent handovers and find the one matching the target date
+    const recentHandovers = await prisma.shiftHandover.findMany({
+      where: {
+        station_id: station.id,
+        tenant_id,
+        created_at: { gte: new Date(nowSP().getTime() - 7 * 24 * 60 * 60 * 1000) },
+      },
       orderBy: { created_at: "desc" },
       include: {
         items: {
@@ -28,6 +40,10 @@ async function getProductionDashboard(req: AppRequest) {
         }
       }
     });
+
+    const latestHandover = recentHandovers.find(
+      (h) => dateLabelSP(h.created_at) === targetLabel
+    ) ?? null;
 
     if (!latestHandover) continue;
 
@@ -47,6 +63,10 @@ async function getProductionDashboard(req: AppRequest) {
       const dayTarget = hc.prepItem.dayTargets.find((dt: any) => dt.day_of_week === todayDow);
       const target = dayTarget?.target_quantity ?? hc.prepItem.target_quantity;
       const actual = hc.actual_quantity;
+
+      // Skip items that were not counted (no value inserted) — they appear only as Theoretical Need
+      if (actual === null || actual === undefined) continue;
+
       const already_produced = producedByItem[hc.prepItem.id] ?? 0;
       const to_produce = Math.max(0, target - actual - already_produced);
 
@@ -74,7 +94,7 @@ async function getProductionDashboard(req: AppRequest) {
     }
   }
 
-  return NextResponse.json({ stations: dashboardStations, server_time: formatSP() });
+  return NextResponse.json({ stations: dashboardStations, server_time: formatSP(), date_label: targetLabel });
 }
 
 export const GET = compose(withAuth, withTenant, withRole(["ADMIN", "MANAGER", "PREP_KITCHEN"]), withModule("production"), getProductionDashboard);

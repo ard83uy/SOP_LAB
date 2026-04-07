@@ -25,6 +25,7 @@ export const updatePrepItemSchema = z.object({
 
 export const submitHandoverSchema = z.object({
   station_id: z.string().uuid(),
+  note: z.string().optional(),
   items: z.array(
     z.object({
       prep_item_id: z.string().uuid(),
