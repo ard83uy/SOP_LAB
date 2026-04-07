@@ -11,6 +11,10 @@ export const createPrepItemSchema = z.object({
   target_quantity: z.number().positive().max(99999),
 });
 
+export const updateStationSchema = z.object({
+  name: z.string().min(2).max(100),
+});
+
 export const updatePrepItemSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   unit: z.string().min(1).max(20).optional(),

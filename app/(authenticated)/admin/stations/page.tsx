@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, LayoutDashboard, Trash2 } from "lucide-react";
+import { Plus, LayoutDashboard, Trash2, Pencil } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -38,6 +38,7 @@ export default function StationsPage() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editStation, setEditStation] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -81,6 +82,32 @@ export default function StationsPage() {
     },
   });
 
+  const editForm = useForm<z.infer<typeof createStationSchema>>({
+    resolver: zodResolver(createStationSchema),
+    defaultValues: { name: "" },
+  });
+
+  const renameMutation = useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const res = await fetch(`/api/stations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Falha ao renomear praça");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["stations"] });
+      toast.success("Praça renomeada!");
+      setEditStation(null);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await fetch(`/api/stations/${id}`, {
@@ -95,6 +122,13 @@ export default function StationsPage() {
     },
     onError: (error) => toast.error(error.message),
   });
+
+  const handleEditClick = (e: React.MouseEvent, station: { id: string; name: string }) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditStation(station);
+    editForm.reset({ name: station.name });
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
@@ -163,6 +197,34 @@ export default function StationsPage() {
             </Form>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={!!editStation} onOpenChange={(o) => !o && setEditStation(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Renomear Praça</DialogTitle>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit((v) => renameMutation.mutate({ id: editStation!.id, name: v.name }))} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Novo Nome</FormLabel>
+                      <FormControl>
+                        <Input className="h-12 text-lg" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full h-12 text-lg" disabled={renameMutation.isPending}>
+                  {renameMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {isLoading ? (
@@ -211,12 +273,20 @@ export default function StationsPage() {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={(e) => handleDeleteClick(e, station.id)}
-                      className="absolute top-6 right-6 p-2 text-muted-foreground hover:text-destructive md:opacity-0 md:group-hover:opacity-100 transition-opacity"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                    <div className="absolute top-4 right-4 flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => handleEditClick(e, station)}
+                        className="p-2 text-muted-foreground hover:text-primary"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteClick(e, station.id)}
+                        className="p-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
