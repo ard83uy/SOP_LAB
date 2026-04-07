@@ -3,7 +3,7 @@
     "buildCommand": "npx prisma generate && npm run build"
   },
   "deploy": {
-    "startCommand": "npx prisma migrate reset --force && npx prisma db seed && npx tsx scripts/setup-admin-env.ts && npm run start",
+    "startCommand": "npx prisma migrate deploy && npm run start",
     "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
