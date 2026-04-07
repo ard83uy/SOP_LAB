@@ -40,11 +40,11 @@ import { StationIcon } from "@/components/station-icon";
 
 const countItemSchema = z.object({
   prep_item_id: z.string().uuid(),
-  actual_quantity: z.coerce.number().min(0, "A contagem não pode ser negativa"),
+  actual_quantity: z.union([z.literal(""), z.coerce.number().min(0, "A contagem não pode ser negativa")]),
 });
 
 const submitCountSchema = z.object({
-  items: z.array(countItemSchema).min(1, "Preencha a contagem"),
+  items: z.array(countItemSchema),
 });
 
 export default function HandoverPage() {
@@ -151,7 +151,7 @@ export default function HandoverPage() {
 
   function onSubmit(values: z.infer<typeof submitCountSchema>) {
     const filledItems = values.items
-      .filter(i => i.actual_quantity !== ("" as any) && i.actual_quantity !== null && i.actual_quantity !== undefined)
+      .filter(i => i.actual_quantity !== "" && i.actual_quantity !== null && i.actual_quantity !== undefined)
       .map(i => ({ prep_item_id: i.prep_item_id, actual_quantity: Number(i.actual_quantity) }));
 
     if (filledItems.length === 0) {
