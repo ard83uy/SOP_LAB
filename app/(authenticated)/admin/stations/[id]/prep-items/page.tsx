@@ -25,6 +25,7 @@ type PrepItem = {
   target_quantity: number;
   effective_target?: number;
   produced_quantity?: number;
+  current_quantity?: number | null;
 };
 
 export default function StationPrepItemsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -181,11 +182,11 @@ export default function StationPrepItemsPage({ params }: { params: Promise<{ id:
                       {item.effective_target ?? item.target_quantity} {item.unit}
                     </strong>
                   </p>
-                  {(item.produced_quantity ?? 0) > 0 && (
+                  {(item.current_quantity ?? 0) > 0 && (
                     <p className="text-sm mt-0.5 text-green-700 dark:text-green-400">
                       Disponível:{" "}
                       <strong>
-                        {item.produced_quantity} {item.unit}
+                        {item.current_quantity} {item.unit}
                       </strong>
                     </p>
                   )}
