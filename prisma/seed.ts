@@ -66,7 +66,7 @@ async function main() {
           name: item.name,
           unit: item.unit,
           target_quantity: item.target,
-          stations: { connect: { id: station.id } },
+          stations: { connect: [{ id: station.id }] },
         },
       });
     }
