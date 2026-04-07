@@ -311,7 +311,7 @@ export default function HandoverPage() {
                   <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1">
                       <h3 className="font-bold text-2xl">{itemInfo.name}</h3>
-                      <p className="text-muted-foreground text-lg">Alvo: <span className="font-semibold text-foreground">{itemInfo.effective_target} {itemInfo.unit}</span>{itemInfo.effective_target !== itemInfo.target_quantity && <span className="text-xs ml-1 text-amber-600">(dia específico)</span>}</p>
+                      <p className="text-muted-foreground text-lg">Utilização média: <span className="font-semibold text-foreground">{itemInfo.effective_target} {itemInfo.unit}</span>{itemInfo.effective_target !== itemInfo.target_quantity && <span className="text-xs ml-1 text-amber-600">(dia específico)</span>}</p>
                       {itemInfo.current_quantity != null && (
                         <p className="text-blue-600 text-base font-medium mt-0.5">
                           Esperado agora: <span className="font-bold">{itemInfo.current_quantity} {itemInfo.unit}</span>

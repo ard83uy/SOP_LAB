@@ -177,7 +177,7 @@ function ProductionCard({
                 Faltam: {item.to_produce} {item.unit}
               </div>
               <p className="text-muted-foreground text-base font-medium">
-                Atual: {item.actual_quantity} / Alvo: {item.target_quantity}
+                Atual: {item.actual_quantity} / Utilização média: {item.target_quantity}
                 {item.is_day_specific && (
                   <span className="text-amber-600 ml-1 text-sm">(dia específico)</span>
                 )}
