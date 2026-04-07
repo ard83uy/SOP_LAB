@@ -8,7 +8,7 @@ import { createStationSchema } from "@/lib/validations/schemas";
 import { prisma } from "@/lib/prisma";
 
 async function createStationHandler(req: AppRequest) {
-  const { name } = req.ctx.parsedBody;
+  const { name, icon } = req.ctx.parsedBody;
   const tenant_id = req.ctx.tenant_id!;
 
   const existing = await prisma.station.findUnique({
@@ -20,10 +20,10 @@ async function createStationHandler(req: AppRequest) {
   }
 
   const station = await prisma.station.create({
-    data: { name, tenant_id }
+    data: { name, tenant_id, icon: icon || "UtensilsCrossed" }
   });
 
-  req.logger.info({ station_id: station.id, name }, "Station created");
+  req.logger.info({ station_id: station.id, name, icon: station.icon }, "Station created");
 
   return NextResponse.json(station, { status: 201 });
 }

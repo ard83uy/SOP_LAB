@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus, LayoutDashboard, Trash2, Pencil } from "lucide-react";
+import * as Icons from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -28,9 +29,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
+import { IconPicker } from "@/components/icon-picker";
 
 const createStationSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(100),
+  icon: z.string().optional(),
 });
 
 export default function StationsPage() {
@@ -38,7 +41,7 @@ export default function StationsPage() {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [editStation, setEditStation] = useState<{ id: string; name: string } | null>(null);
+  const [editStation, setEditStation] = useState<{ id: string; name: string; icon?: string } | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -55,7 +58,7 @@ export default function StationsPage() {
 
   const form = useForm<z.infer<typeof createStationSchema>>({
     resolver: zodResolver(createStationSchema),
-    defaultValues: { name: "" },
+    defaultValues: { name: "", icon: "UtensilsCrossed" },
   });
 
   const mutation = useMutation({
@@ -84,15 +87,15 @@ export default function StationsPage() {
 
   const editForm = useForm<z.infer<typeof createStationSchema>>({
     resolver: zodResolver(createStationSchema),
-    defaultValues: { name: "" },
+    defaultValues: { name: "", icon: "UtensilsCrossed" },
   });
 
   const renameMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+    mutationFn: async ({ id, name, icon }: { id: string; name: string; icon?: string }) => {
       const res = await fetch(`/api/stations/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, icon }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -102,7 +105,7 @@ export default function StationsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["stations"] });
-      toast.success("Praça renomeada!");
+      toast.success("Praça atualizada!");
       setEditStation(null);
     },
     onError: (error) => toast.error(error.message),
@@ -123,11 +126,11 @@ export default function StationsPage() {
     onError: (error) => toast.error(error.message),
   });
 
-  const handleEditClick = (e: React.MouseEvent, station: { id: string; name: string }) => {
+  const handleEditClick = (e: React.MouseEvent, station: { id: string; name: string; icon?: string }) => {
     e.preventDefault();
     e.stopPropagation();
     setEditStation(station);
-    editForm.reset({ name: station.name });
+    editForm.reset({ name: station.name, icon: station.icon || "UtensilsCrossed" });
   };
 
   const handleDeleteClick = (e: React.MouseEvent, id: string) => {
@@ -152,6 +155,16 @@ export default function StationsPage() {
   function onSubmit(values: z.infer<typeof createStationSchema>) {
     mutation.mutate(values);
   }
+
+  const getStationIcon = (iconName?: string) => {
+    const name = iconName || "UtensilsCrossed";
+    const IconComponent = Icons[name as keyof typeof Icons] as any;
+    return IconComponent ? (
+      <IconComponent className="w-6 h-6 text-primary" />
+    ) : (
+      <LayoutDashboard className="w-6 h-6 text-primary" />
+    );
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
@@ -190,6 +203,22 @@ export default function StationsPage() {
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="icon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ícone</FormLabel>
+                      <FormControl>
+                        <IconPicker
+                          value={field.value}
+                          onSelect={(icon) => field.onChange(icon)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <Button type="submit" className="w-full h-12 text-lg" disabled={mutation.isPending}>
                   {mutation.isPending ? "Salvando..." : "Salvar Praça"}
                 </Button>
@@ -201,18 +230,34 @@ export default function StationsPage() {
         <Dialog open={!!editStation} onOpenChange={(o) => !o && setEditStation(null)}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Renomear Praça</DialogTitle>
+              <DialogTitle>Editar Praça</DialogTitle>
             </DialogHeader>
             <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit((v) => renameMutation.mutate({ id: editStation!.id, name: v.name }))} className="space-y-4">
+              <form onSubmit={editForm.handleSubmit((v) => renameMutation.mutate({ id: editStation!.id, name: v.name, icon: v.icon }))} className="space-y-4">
                 <FormField
                   control={editForm.control}
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Novo Nome</FormLabel>
+                      <FormLabel>Nome</FormLabel>
                       <FormControl>
                         <Input className="h-12 text-lg" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="icon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Ícone</FormLabel>
+                      <FormControl>
+                        <IconPicker
+                          value={field.value}
+                          onSelect={(icon) => field.onChange(icon)}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -248,7 +293,7 @@ export default function StationsPage() {
               <Card className="hover:border-primary transition-all cursor-pointer active:scale-[0.98] relative group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="bg-primary/10 p-3 rounded-full flex-shrink-0">
-                    <LayoutDashboard className="w-6 h-6 text-primary" />
+                    {getStationIcon(station.icon)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <h2 className="text-xl font-bold truncate pr-8">{station.name}</h2>

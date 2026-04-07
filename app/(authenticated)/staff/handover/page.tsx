@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
+import { StationIcon } from "@/components/station-icon";
 
 const countItemSchema = z.object({
   prep_item_id: z.string().uuid(),
@@ -236,7 +237,7 @@ export default function HandoverPage() {
               <Card key={station.id} className="hover:border-primary transition-all cursor-pointer shadow-sm active:scale-95" onClick={() => setSelectedStation(station)}>
                  <CardContent className="p-6 flex flex-col items-center justify-center gap-4 text-center aspect-square">
                     <div className="bg-primary/10 p-4 rounded-full">
-                      <LayoutDashboard className="w-8 h-8 text-primary" />
+                      <StationIcon iconName={station.icon} className="w-8 h-8 text-primary" />
                     </div>
                     <h2 className="text-xl font-bold">{station.name}</h2>
                  </CardContent>

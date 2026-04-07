@@ -1,0 +1,68 @@
+{
+  "name": "SOP - Gestão Operacional de Restaurantes",
+  "short_name": "SOP",
+  "description": "Aplicação para gestão operacional de restaurantes (Back-of-House)",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#c41432",
+  "background_color": "#faf8f6",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshot-1.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshot-2.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "shortcuts": [
+    {
+      "name": "Contagem de Insumos",
+      "short_name": "Contagem",
+      "description": "Acesse rapidamente a contagem de insumos",
+      "url": "/counting",
+      "icons": [{ "src": "/shortcut-counting.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard de Produção",
+      "short_name": "Produção",
+      "description": "Acesse rapidamente o dashboard de produção",
+      "url": "/dashboard",
+      "icons": [{ "src": "/shortcut-dashboard.png", "sizes": "192x192" }]
+    }
+  ]
+}

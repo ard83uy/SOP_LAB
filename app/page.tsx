@@ -37,7 +37,7 @@ export default async function LandingPage() {
             SOP Mobile
           </h1>
           <p className="text-base text-muted-foreground leading-relaxed">
-            Controle insumos, padronize execuções e elimine o desperdício na sua cozinha.
+            Padronização, processos e performance para sua cozinha
           </p>
         </div>
 
@@ -52,9 +52,6 @@ export default async function LandingPage() {
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
-          <p className="text-xs text-muted-foreground/70">
-            Uso exclusivo para parceiros e funcionários autorizados.
-          </p>
         </div>
       </div>
     </div>

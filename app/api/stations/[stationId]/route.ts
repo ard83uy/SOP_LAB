@@ -14,7 +14,7 @@ export const PATCH = compose(
   withValidation(updateStationSchema),
   async (req: AppRequest, { params }: { params: { stationId: string } }) => {
     const { stationId } = params;
-    const { name } = req.ctx.parsedBody;
+    const { name, icon } = req.ctx.parsedBody;
     const tenant_id = req.ctx.tenant_id!;
 
     const existing = await prisma.station.findFirst({
@@ -26,7 +26,7 @@ export const PATCH = compose(
 
     const station = await prisma.station.update({
       where: { id: stationId },
-      data: { name },
+      data: { name, ...(icon && { icon }) },
     });
 
     return NextResponse.json(station);

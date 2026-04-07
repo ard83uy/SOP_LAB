@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const createStationSchema = z.object({
   name: z.string().min(2).max(100),
+  icon: z.string().optional(),
 });
 
 export const createPrepItemSchema = z.object({
@@ -13,6 +14,7 @@ export const createPrepItemSchema = z.object({
 
 export const updateStationSchema = z.object({
   name: z.string().min(2).max(100),
+  icon: z.string().optional(),
 });
 
 export const updatePrepItemSchema = z.object({
