@@ -36,7 +36,7 @@ export const PATCH = compose(
 export const DELETE = compose(
   withAuth,
   withTenant,
-  withRole(["ADMIN"]),
+  withRole(["ADMIN", "MANAGER"]),
   async (req: AppRequest, { params }: { params: { stationId: string } }) => {
     const { stationId } = params;
 

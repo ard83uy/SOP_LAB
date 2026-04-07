@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/decimal-input";
 import {
   Dialog,
   DialogContent,
@@ -29,22 +29,6 @@ type ProductionItem = {
   shift_handover_id: string;
   is_day_specific: boolean;
   already_produced: number;
-};
-
-type TheoreticalItem = {
-  prep_item_id: string;
-  name: string;
-  unit: string;
-  effective_target: number;
-  last_count: number | null;
-  days_since: number | null;
-  theoretical_need: number;
-};
-
-type TheoreticalStation = {
-  station_name: string;
-  items: TheoreticalItem[];
-  handover_is_today: boolean;
 };
 
 type HandoverGroup = {
@@ -274,10 +258,8 @@ function ProductionCard({
           </div>
 
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Input
+            <DecimalInput
               className="h-16 text-2xl font-bold w-full sm:w-32 text-center rounded-xl bg-muted/30"
-              type="number"
-              inputMode="decimal"
               value={val}
               onChange={(e) => setVal(e.target.value)}
             />
@@ -417,6 +399,44 @@ function ProductionDashboard() {
     </button>
   );
 
+  const theoretical = data?.theoretical || [];
+
+  const theoreticalSection = theoretical.length > 0 && (
+    <div className="mt-10 space-y-5">
+      <div className="flex items-center gap-2 border-b pb-3">
+        <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+        <h2 className="text-lg font-bold text-amber-700 dark:text-amber-400">Necessidade Teórica</h2>
+        <span className="text-xs text-muted-foreground font-normal ml-1">
+          — Itens não contados. Valores estimados com base na utilização média
+        </span>
+      </div>
+      <div className="grid gap-3">
+        {theoretical.flatMap((station: any) =>
+          station.items.map((item: any) => (
+            <Card
+              key={`${station.station_name}-${item.prep_item_id}`}
+              className="border-amber-300 dark:border-amber-700/60 bg-amber-50/60 dark:bg-amber-950/20"
+            >
+              <CardContent className="p-4 flex items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-base">{item.name}</span>
+                    <span className="text-xs text-muted-foreground">· {station.station_name}</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-extrabold text-lg text-amber-700 dark:text-amber-400">
+                    ~{parseFloat(item.effective_target.toFixed(3))} {item.unit}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   if (stations.length === 0) {
     return (
       <>
@@ -432,7 +452,7 @@ function ProductionDashboard() {
             </p>
           </div>
         </div>
-        <TheoreticalNeeds />
+        {theoreticalSection}
         {dateModalOpen && (
           <DatePickerModal
             selectedDate={selectedDate}
@@ -480,7 +500,7 @@ function ProductionDashboard() {
         ))}
       </div>
 
-      <TheoreticalNeeds />
+      {theoreticalSection}
 
       {confirmState && (
         <ConfirmProduceDialog
@@ -499,90 +519,6 @@ function ProductionDashboard() {
         />
       )}
     </>
-  );
-}
-
-// ── Theoretical Needs ─────────────────────────────────────────────────────────
-
-function TheoreticalNeeds() {
-  const { data, isLoading } = useQuery<{ stations: TheoreticalStation[] }>({
-    queryKey: ["production-theoretical"],
-    queryFn: async () => {
-      const res = await fetch("/api/production/theoretical");
-      if (!res.ok) throw new Error();
-      return res.json();
-    },
-    refetchInterval: 1000 * 60 * 5,
-  });
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2 mt-10">
-        <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-16 rounded-xl" />
-        <Skeleton className="h-16 rounded-xl" />
-      </div>
-    );
-  }
-
-  const stations = data?.stations ?? [];
-  if (stations.length === 0) return null;
-
-  return (
-    <div className="mt-10 space-y-5">
-      <div className="flex items-center gap-2 border-b pb-3">
-        <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-        <h2 className="text-lg font-bold text-amber-700 dark:text-amber-400">Necessário Teórico</h2>
-        <span className="text-xs text-muted-foreground font-normal ml-1">
-          — Valores estimados. Não houve contagem
-        </span>
-      </div>
-
-      <div className="grid gap-3">
-        {stations.flatMap((station) =>
-          station.items.map((item) => {
-            const noCount = item.last_count === null;
-            const stale = !station.handover_is_today;
-
-            let countLabel: string;
-            if (noCount) {
-              countLabel = "sem contagem registrada";
-            } else if (item.days_since === 0) {
-              countLabel = `última contagem hoje: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
-            } else if (item.days_since === 1) {
-              countLabel = `última contagem ontem: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
-            } else {
-              countLabel = `última contagem há ${item.days_since} dias: ${parseFloat(item.last_count!.toFixed(3))} ${item.unit}`;
-            }
-
-            return (
-              <Card
-                key={`${station.station_name}-${item.prep_item_id}`}
-                className="border-amber-300 dark:border-amber-700/60 bg-amber-50/60 dark:bg-amber-950/20"
-              >
-                <CardContent className="p-4 flex items-center justify-between gap-4">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-base">{item.name}</span>
-                      <span className="text-xs text-muted-foreground">· {station.station_name}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{countLabel}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-extrabold text-lg text-amber-700 dark:text-amber-400">
-                      ~{parseFloat(item.theoretical_need.toFixed(3))} {item.unit}
-                    </p>
-                    {stale && item.days_since !== null && item.days_since > 0 && (
-                      <p className="text-[10px] text-amber-600/70 dark:text-amber-500/70">estimado</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
-    </div>
   );
 }
 

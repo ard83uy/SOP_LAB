@@ -39,5 +39,5 @@ async function listStationsHandler(req: AppRequest) {
   return NextResponse.json(stations);
 }
 
-export const POST = compose(withAuth, withTenant, withRole(["ADMIN"]), withValidation(createStationSchema), createStationHandler);
+export const POST = compose(withAuth, withTenant, withRole(["ADMIN", "MANAGER"]), withValidation(createStationSchema), createStationHandler);
 export const GET = compose(withAuth, withTenant, listStationsHandler);

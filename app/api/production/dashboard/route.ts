@@ -22,10 +22,17 @@ async function getProductionDashboard(req: AppRequest) {
   });
 
   const dashboardStations = [];
+  const theoreticalStations = [];
 
   const todayDow = todayDowSP();
 
   for (const station of stations) {
+    // Fetch station prep items for theoretical needs
+    const stationPrepItems = await prisma.prepItem.findMany({
+      where: { stations: { some: { id: station.id } } },
+      include: { dayTargets: true } as any,
+    });
+
     // Fetch recent handovers and find the one matching the target date
     const recentHandovers = await prisma.shiftHandover.findMany({
       where: {
@@ -45,10 +52,30 @@ async function getProductionDashboard(req: AppRequest) {
       (h) => dateLabelSP(h.created_at) === targetLabel
     ) ?? null;
 
-    if (!latestHandover) continue;
+    if (!latestHandover) {
+      // No handover for this date — all items are theoretical
+      const theoreticalItems = (stationPrepItems as any[])
+        .map((item) => {
+          const dayTarget = item.dayTargets?.find((dt: any) => dt.day_of_week === todayDow);
+          const effective_target = dayTarget?.target_quantity ?? item.target_quantity;
+          return {
+            prep_item_id: item.id,
+            name: item.name,
+            unit: item.unit,
+            effective_target,
+          };
+        })
+        .filter((i) => i.effective_target > 0);
+
+      if (theoreticalItems.length > 0) {
+        theoreticalStations.push({ station_name: station.name, items: theoreticalItems });
+      }
+      continue;
+    }
 
     const handover = latestHandover as any;
     const itemsToProduce = [];
+    const countedIds = new Set(handover.items.map((hc: any) => hc.prep_item_id as string));
 
     const productionTotals = await prisma.productionLog.groupBy({
       by: ["prep_item_id"],
@@ -64,7 +91,6 @@ async function getProductionDashboard(req: AppRequest) {
       const target = dayTarget?.target_quantity ?? hc.prepItem.target_quantity;
       const actual = hc.actual_quantity;
 
-      // Skip items that were not counted (no value inserted) — they appear only as Theoretical Need
       if (actual === null || actual === undefined) continue;
 
       const already_produced = producedByItem[hc.prepItem.id] ?? 0;
@@ -86,6 +112,21 @@ async function getProductionDashboard(req: AppRequest) {
       }
     }
 
+    // Uncounted items → theoretical needs
+    const theoreticalItems = (stationPrepItems as any[])
+      .filter((item) => !countedIds.has(item.id))
+      .map((item) => {
+        const dayTarget = item.dayTargets?.find((dt: any) => dt.day_of_week === todayDow);
+        const effective_target = dayTarget?.target_quantity ?? item.target_quantity;
+        return {
+          prep_item_id: item.id,
+          name: item.name,
+          unit: item.unit,
+          effective_target,
+        };
+      })
+      .filter((i) => i.effective_target > 0);
+
     if (itemsToProduce.length > 0) {
       dashboardStations.push({
         station_name: station.name,
@@ -93,9 +134,13 @@ async function getProductionDashboard(req: AppRequest) {
         items: itemsToProduce
       });
     }
+
+    if (theoreticalItems.length > 0) {
+      theoreticalStations.push({ station_name: station.name, items: theoreticalItems });
+    }
   }
 
-  return NextResponse.json({ stations: dashboardStations, server_time: formatSP(), date_label: targetLabel });
+  return NextResponse.json({ stations: dashboardStations, theoretical: theoreticalStations, server_time: formatSP(), date_label: targetLabel });
 }
 
 export const GET = compose(withAuth, withTenant, withRole(["ADMIN", "MANAGER", "PREP_KITCHEN"]), withModule("production"), getProductionDashboard);

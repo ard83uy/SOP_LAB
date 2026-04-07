@@ -47,6 +47,15 @@ export default function StationsPage() {
     setMounted(true);
   }, []);
 
+  const { data: user } = useQuery({
+    queryKey: ["user-me"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/me");
+      if (!res.ok) throw new Error("Falha ao carregar usuário");
+      return res.json();
+    },
+  });
+
   const { data: stations, isLoading, error } = useQuery({
     queryKey: ["stations"],
     queryFn: async () => {
@@ -55,6 +64,10 @@ export default function StationsPage() {
       return res.json();
     },
   });
+
+  const canCreate = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canEdit = user?.role === "ADMIN" || user?.role === "MANAGER";
+  const canDelete = user?.role === "ADMIN" || user?.role === "MANAGER";
 
   const form = useForm<z.infer<typeof createStationSchema>>({
     resolver: zodResolver(createStationSchema),
@@ -170,10 +183,10 @@ export default function StationsPage() {
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold tracking-tight">Praças</h1>
-        {mounted && (
-          <Button 
-            onClick={() => setOpen(true)} 
-            size="icon" 
+        {mounted && canCreate && (
+          <Button
+            onClick={() => setOpen(true)}
+            size="icon"
             className="rounded-full shadow-lg h-14 w-14 fixed bottom-24 right-4 md:static md:w-auto md:h-11 md:rounded-md md:px-4 md:shadow-none z-40"
           >
             <Plus className="w-7 h-7 md:hidden" />
@@ -299,39 +312,47 @@ export default function StationsPage() {
                     <h2 className="text-xl font-bold truncate pr-8">{station.name}</h2>
                   </div>
                   
-                  {confirmDeleteId === station.id ? (
-                    <div
-                      className="absolute top-4 right-4 flex items-center gap-1"
-                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                    >
-                      <button
-                        onClick={handleConfirmDelete}
-                        className="px-2 py-1 text-xs font-medium bg-destructive text-destructive-foreground rounded"
-                      >
-                        Excluir
-                      </button>
-                      <button
-                        onClick={handleCancelDelete}
-                        className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="absolute top-4 right-4 flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={(e) => handleEditClick(e, station)}
-                        className="p-2 text-muted-foreground hover:text-primary"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeleteClick(e, station.id)}
-                        className="p-2 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                  {(canEdit || canDelete) && (
+                    <>
+                      {confirmDeleteId === station.id ? (
+                        <div
+                          className="absolute top-4 right-4 flex items-center gap-1"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                        >
+                          <button
+                            onClick={handleConfirmDelete}
+                            className="px-2 py-1 text-xs font-medium bg-destructive text-destructive-foreground rounded"
+                          >
+                            Excluir
+                          </button>
+                          <button
+                            onClick={handleCancelDelete}
+                            className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="absolute top-4 right-4 flex items-center gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                          {canEdit && (
+                            <button
+                              onClick={(e) => handleEditClick(e, station)}
+                              className="p-2 text-muted-foreground hover:text-primary"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button
+                              onClick={(e) => handleDeleteClick(e, station.id)}
+                              className="p-2 text-muted-foreground hover:text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </Card>

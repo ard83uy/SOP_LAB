@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DecimalInput } from "@/components/decimal-input";
 import {
   Select,
   SelectContent,
@@ -353,12 +354,9 @@ export default function HandoverPage() {
                           <FormItem>
                             <FormControl>
                               <div className="flex items-center relative">
-                                <Input 
-                                  className="h-16 text-3xl font-bold text-center pr-12 rounded-xl" 
-                                  type="number" 
-                                  inputMode="decimal" 
-                                  step="0.01" 
-                                  {...inputField} 
+                                <DecimalInput
+                                  className="h-16 text-3xl font-bold text-center pr-12 rounded-xl"
+                                  {...inputField}
                                 />
                                 <span className="absolute right-4 text-muted-foreground font-semibold text-lg">
                                   {itemInfo.unit}

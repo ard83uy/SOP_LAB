@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/decimal-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
@@ -83,11 +84,8 @@ function DayTargetGrid({ item, onClose }: { item: PrepItem; onClose: () => void 
         {DAYS.map((day, dow) => (
           <div key={dow} className="flex flex-col items-center gap-1">
             <span className="text-xs font-semibold text-muted-foreground">{day}</span>
-            <Input
+            <DecimalInput
               className="h-12 text-center text-base font-bold p-1"
-              type="number"
-              inputMode="decimal"
-              step="0.1"
               value={getVal(dow)}
               onChange={(e) => setValues((v) => ({ ...v, [dow]: e.target.value }))}
             />
@@ -226,11 +224,8 @@ function ItemFormDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Média padrão</label>
-              <Input
+              <DecimalInput
                 className="h-12 text-lg"
-                type="number"
-                inputMode="decimal"
-                step="0.1"
                 placeholder="0"
                 value={form.target_quantity}
                 onChange={(e) => setForm((v) => ({ ...v, target_quantity: e.target.value }))}
@@ -349,8 +344,7 @@ function RequestsPanel() {
             <p className="text-sm text-muted-foreground">
               Média padrão para <strong>{approvingReq?.station.name}</strong> ({approvingReq?.unit}):
             </p>
-            <Input
-              type="number" inputMode="decimal" step="0.1"
+            <DecimalInput
               placeholder="0" className="h-12 text-lg"
               value={reviewTarget[approveDialogId ?? ""] ?? ""}
               onChange={(e) => setReviewTarget((v) => ({ ...v, [approveDialogId ?? ""]: e.target.value }))}
