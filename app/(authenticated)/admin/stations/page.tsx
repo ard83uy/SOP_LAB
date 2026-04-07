@@ -37,6 +37,7 @@ export default function StationsPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -95,12 +96,23 @@ export default function StationsPage() {
     onError: (error) => toast.error(error.message),
   });
 
-  const handleDelete = (e: React.MouseEvent, id: string) => {
+  const handleDeleteClick = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     e.stopPropagation();
-    if (confirm("Tem certeza que deseja excluir esta praça e todos os seus insumos?")) {
-      deleteMutation.mutate(id);
-    }
+    setConfirmDeleteId(id);
+  };
+
+  const handleConfirmDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirmDeleteId) deleteMutation.mutate(confirmDeleteId);
+    setConfirmDeleteId(null);
+  };
+
+  const handleCancelDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setConfirmDeleteId(null);
   };
 
   function onSubmit(values: z.infer<typeof createStationSchema>) {
@@ -180,12 +192,32 @@ export default function StationsPage() {
                     <h2 className="text-xl font-bold truncate pr-8">{station.name}</h2>
                   </div>
                   
-                  <button 
-                    onClick={(e) => handleDelete(e, station.id)}
-                    className="absolute top-6 right-6 p-2 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
+                  {confirmDeleteId === station.id ? (
+                    <div
+                      className="absolute top-4 right-4 flex items-center gap-1"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    >
+                      <button
+                        onClick={handleConfirmDelete}
+                        className="px-2 py-1 text-xs font-medium bg-destructive text-destructive-foreground rounded"
+                      >
+                        Excluir
+                      </button>
+                      <button
+                        onClick={handleCancelDelete}
+                        className="px-2 py-1 text-xs font-medium bg-muted text-muted-foreground rounded"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={(e) => handleDeleteClick(e, station.id)}
+                      className="absolute top-6 right-6 p-2 text-muted-foreground hover:text-destructive md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
                 </CardContent>
               </Card>
             </Link>
