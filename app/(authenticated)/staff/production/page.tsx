@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { CalendarDays, ChefHat, CheckCircle2, ClipboardList, History, TrendingUp } from "lucide-react";
+import { CalendarDays, ChefHat, CheckCircle2, ClipboardList, History, TrendingUp, MessageSquareText } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -460,6 +460,12 @@ function ProductionDashboard() {
               <ChefHat className="w-7 h-7 text-primary" />
               {station.station_name}
             </h2>
+            {station.note && (
+              <div className="flex items-start gap-2 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <MessageSquareText className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                <p className="text-sm text-blue-800 dark:text-blue-300">{station.note}</p>
+              </div>
+            )}
             <div className="grid gap-5">
               {station.items.map((item: ProductionItem) => (
                 <ProductionCard

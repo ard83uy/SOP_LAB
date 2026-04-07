@@ -89,6 +89,7 @@ async function getProductionDashboard(req: AppRequest) {
     if (itemsToProduce.length > 0) {
       dashboardStations.push({
         station_name: station.name,
+        note: handover.note ?? null,
         items: itemsToProduce
       });
     }

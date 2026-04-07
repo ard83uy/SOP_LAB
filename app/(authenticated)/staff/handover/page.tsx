@@ -109,17 +109,11 @@ export default function HandoverPage() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["production-dashboard"] });
-      const missing = [];
-      for (const i of data.items) {
-        const originalItem = prepItems.find((p: any) => p.id === i.prep_item_id);
-        if (!originalItem) continue;
-        const target = originalItem.effective_target ?? originalItem.target_quantity;
-        const actual = i.actual_quantity;
-        if (target > actual) {
-          missing.push({ name: originalItem.name, unit: originalItem.unit, qty: target - actual });
-        }
-      }
-      setSuccessData({ missing });
+      const counted = data.items.map((i: any) => {
+        const info = prepItems.find((p: any) => p.id === i.prep_item_id);
+        return { name: info?.name ?? i.prep_item_id, unit: info?.unit ?? "", qty: i.actual_quantity };
+      });
+      setSuccessData({ counted, note: data.note ?? null });
       setReviewState(null);
       toast.success("Contagem salva com sucesso!");
     },
@@ -195,24 +189,31 @@ export default function HandoverPage() {
           <p className="text-muted-foreground text-lg">O turno foi registrado com sucesso.</p>
         </div>
 
-        {successData.missing.length > 0 ? (
+        {successData.note && (
+          <Card className="w-full text-left">
+            <CardContent className="p-4 flex items-start gap-2">
+              <Package className="w-5 h-5 text-muted-foreground shrink-0 mt-0.5" />
+              <p className="text-base text-foreground">{successData.note}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {successData.counted.length > 0 && (
           <Card className="w-full text-left">
             <CardContent className="p-6">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-                <ChefHat className="w-5 h-5" /> Irá para produção:
+                <ChefHat className="w-5 h-5" /> Itens contados:
               </h3>
               <ul className="space-y-3">
-                {successData.missing.map((m: any, idx: number) => (
+                {successData.counted.map((c: any, idx: number) => (
                   <li key={idx} className="flex justify-between border-b pb-2 last:border-0 last:pb-0">
-                    <span className="font-medium text-lg">{m.name}</span>
-                    <span className="font-bold text-red-600 text-lg">{m.qty} {m.unit}</span>
+                    <span className="font-medium text-lg">{c.name}</span>
+                    <span className="font-bold text-lg">{c.qty} {c.unit}</span>
                   </li>
                 ))}
               </ul>
             </CardContent>
           </Card>
-        ) : (
-           <p className="text-green-700 font-bold bg-green-50 p-4 rounded-xl w-full text-lg shadow-sm">Tudo em dia! Nada para produzir.</p>
         )}
 
         <Button onClick={restart} className="w-full h-14 text-lg mt-8 shadow-md" size="lg">Nova Contagem</Button>
