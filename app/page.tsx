@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChefHat, ArrowRight, Flame } from "lucide-react";
+import { Store, ArrowRight, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -23,7 +23,7 @@ export default async function LandingPage() {
         {/* Icon */}
         <div className="flex items-center justify-center">
           <div className="bg-primary p-5 rounded-2xl shadow-lg shadow-primary/30">
-            <ChefHat className="w-12 h-12 text-primary-foreground" />
+            <Store className="w-12 h-12 text-primary-foreground" />
           </div>
         </div>
 
@@ -37,7 +37,7 @@ export default async function LandingPage() {
             SOP Mobile
           </h1>
           <p className="text-base text-muted-foreground leading-relaxed">
-            Padronização, processos e performance para sua cozinha
+            Padronização, processos e performance para seu restaurante
           </p>
         </div>
 
@@ -48,7 +48,7 @@ export default async function LandingPage() {
               size="lg"
               className="w-full h-14 text-base font-bold rounded-xl shadow-lg shadow-primary/25 hover:shadow-primary/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
             >
-              Entrar na Cozinha
+              Entrar no Sistema
               <ArrowRight className="ml-2 w-5 h-5" />
             </Button>
           </Link>
