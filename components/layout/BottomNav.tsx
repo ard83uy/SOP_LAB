@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useClerk } from "@clerk/nextjs";
-import { ClipboardList, ChefHat, Users, LayoutDashboard, Loader2, LogOut, Package } from "lucide-react";
+import { ClipboardList, ChefHat, Users, LayoutDashboard, Loader2, LogOut, Package, BookOpen } from "lucide-react";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -40,6 +40,7 @@ export function BottomNav() {
           { href: "/staff/handover", label: "Contagem", icon: ClipboardList },
           { href: "/staff/production", label: "Produção", icon: ChefHat },
           { href: "/admin/prep-items", label: "Insumos", icon: Package },
+          { href: "/admin/fichas-tecnicas", label: "Fichas", icon: BookOpen },
           { href: "/admin/team", label: "Equipe", icon: Users },
         ];
       case "STATION_LEADER":

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, CheckCircle2, Package, ChefHat, Plus } from "lucide-react";
+import { LayoutDashboard, CheckCircle2, Package, ChefHat, Plus, ClipboardList, History } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
+import { Badge } from "@/components/ui/badge";
 import { StationIcon } from "@/components/station-icon";
 
 const countItemSchema = z.object({
@@ -54,6 +55,7 @@ export default function HandoverPage() {
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestForm, setRequestForm] = useState({ name: "", unit: "kg", note: "" });
   const [reviewState, setReviewState] = useState<{ items: { id: string; name: string; unit: string; qty: number }[]; comment: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<"contagem" | "historico">("contagem");
 
   const { data: stations, isLoading: loadingStations } = useQuery({
     queryKey: ["stations"],
@@ -76,6 +78,35 @@ export default function HandoverPage() {
 
   const prepItems = prepData?.items ?? prepData;
   const serverTime = prepData?.server_time;
+
+  const { data: historyData, isLoading: loadingHistory } = useQuery<{
+    groups: {
+      date: string;
+      handovers: {
+        id: string;
+        time: string;
+        user_name: string;
+        note: string | null;
+        items: {
+          name: string;
+          unit: string;
+          target: number;
+          counted: number;
+          requested: number;
+          produced: number;
+          production_logs: { user_name: string; time: string; quantity: number }[];
+        }[];
+      }[];
+    }[];
+  }>({
+    queryKey: ["production-history", selectedStation?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/stations/${selectedStation.id}/production-history`);
+      if (!res.ok) throw new Error("Falha ao carregar histórico");
+      return res.json();
+    },
+    enabled: !!selectedStation && activeTab === "historico",
+  });
 
   const form = useForm<z.infer<typeof submitCountSchema>>({
     resolver: zodResolver(submitCountSchema) as any,
@@ -266,6 +297,27 @@ export default function HandoverPage() {
         </div>
       </div>
 
+      {/* Tab Bar */}
+      <div className="flex border-b border-border mb-6">
+        {([
+          { id: "contagem", label: "Contagem", icon: ClipboardList },
+          { id: "historico", label: "Histórico", icon: History },
+        ] as const).map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b-2 transition-colors -mb-px ${
+              activeTab === id
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Icon className="w-4 h-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+
       <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
         <DialogContent>
           <DialogHeader>
@@ -320,68 +372,145 @@ export default function HandoverPage() {
         </DialogContent>
       </Dialog>
 
-      {loadingItems ? (
-        <div className="space-y-4">
-          <Skeleton className="h-28 rounded-xl w-full" />
-          <Skeleton className="h-28 rounded-xl w-full" />
-        </div>
-      ) : !prepItems || prepItems.length === 0 ? (
-        <EmptyState icon={Package} title="Praça vazia" description="Esta praça não possui nenhum insumo mapeado." />
-      ) : (
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {fields.map((field, index) => {
-              const itemInfo = prepItems.find((p: any) => p.id === field.prep_item_id);
-              if (!itemInfo) return null;
-              
-              return (
-                <Card key={field.id} className="overflow-hidden shadow-sm">
-                  <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <h3 className="font-bold text-2xl">{itemInfo.name}</h3>
-                      <p className="text-muted-foreground text-lg">Utilização média: <span className="font-semibold text-foreground">{itemInfo.effective_target} {itemInfo.unit}</span>{itemInfo.effective_target !== itemInfo.target_quantity && <span className="text-xs ml-1 text-amber-600">(dia específico)</span>}</p>
-                      {itemInfo.current_quantity != null && (
-                        <p className="text-blue-600 text-base font-medium mt-0.5">
-                          Esperado agora: <span className="font-bold">{itemInfo.current_quantity} {itemInfo.unit}</span>
+      {/* ── Tab: Contagem ─────────────────────────────────────────── */}
+      {activeTab === "contagem" && (
+        <>
+          {loadingItems ? (
+            <div className="space-y-4">
+              <Skeleton className="h-28 rounded-xl w-full" />
+              <Skeleton className="h-28 rounded-xl w-full" />
+            </div>
+          ) : !prepItems || prepItems.length === 0 ? (
+            <EmptyState icon={Package} title="Praça vazia" description="Esta praça não possui nenhum insumo mapeado." />
+          ) : (
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                {fields.map((field, index) => {
+                  const itemInfo = prepItems.find((p: any) => p.id === field.prep_item_id);
+                  if (!itemInfo) return null;
+
+                  return (
+                    <Card key={field.id} className="overflow-hidden shadow-sm">
+                      <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-2xl">{itemInfo.name}</h3>
+                          <p className="text-muted-foreground text-lg">Utilização média: <span className="font-semibold text-foreground">{itemInfo.effective_target} {itemInfo.unit}</span>{itemInfo.effective_target !== itemInfo.target_quantity && <span className="text-xs ml-1 text-amber-600">(dia específico)</span>}</p>
+                          {itemInfo.current_quantity != null && (
+                            <p className="text-blue-600 text-base font-medium mt-0.5">
+                              Esperado agora: <span className="font-bold">{itemInfo.current_quantity} {itemInfo.unit}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-full sm:w-40 flex-shrink-0">
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.actual_quantity`}
+                            render={({ field: inputField }) => (
+                              <FormItem>
+                                <FormControl>
+                                  <div className="flex items-center relative">
+                                    <DecimalInput
+                                      className="h-16 text-3xl font-bold text-center pr-12 rounded-xl"
+                                      {...inputField}
+                                    />
+                                    <span className="absolute right-4 text-muted-foreground font-semibold text-lg">
+                                      {itemInfo.unit}
+                                    </span>
+                                  </div>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+
+                <div className="fixed bottom-16 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent md:static md:bg-none z-10 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+                  <div className="max-w-3xl mx-auto">
+                    <Button type="submit" size="lg" className="w-full h-16 text-xl shadow-xl font-bold rounded-xl" disabled={mutation.isPending}>
+                      {mutation.isPending ? "Salvando..." : "Salvar Contagem"}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </Form>
+          )}
+        </>
+      )}
+
+      {/* ── Tab: Histórico ─────────────────────────────────────────── */}
+      {activeTab === "historico" && (
+        <div className="space-y-6">
+          {loadingHistory ? (
+            <div className="space-y-4">
+              <Skeleton className="h-40 rounded-xl w-full" />
+              <Skeleton className="h-40 rounded-xl w-full" />
+            </div>
+          ) : !historyData?.groups?.length ? (
+            <EmptyState icon={History} title="Sem histórico" description="Nenhuma contagem registrada nos últimos 30 dias para esta praça." />
+          ) : (
+            historyData.groups.map((group) => (
+              <div key={group.date} className="space-y-3">
+                <h2 className="text-lg font-bold text-muted-foreground">{group.date}</h2>
+                {group.handovers.map((handover) => {
+                  const hasProduction = handover.items.some((item) => item.produced > 0);
+                  return (
+                  <Card key={handover.id} className="overflow-hidden">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                          {handover.time} — {handover.user_name}
+                        </p>
+                      </div>
+                      {handover.note && (
+                        <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-lg px-3 py-2">
+                          {handover.note}
                         </p>
                       )}
-                    </div>
-                    <div className="w-full sm:w-40 flex-shrink-0">
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.actual_quantity`}
-                        render={({ field: inputField }) => (
-                          <FormItem>
-                            <FormControl>
-                              <div className="flex items-center relative">
-                                <DecimalInput
-                                  className="h-16 text-3xl font-bold text-center pr-12 rounded-xl"
-                                  {...inputField}
-                                />
-                                <span className="absolute right-4 text-muted-foreground font-semibold text-lg">
-                                  {itemInfo.unit}
-                                </span>
-                              </div>
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-            
-            <div className="fixed bottom-16 left-0 right-0 p-4 bg-gradient-to-t from-white via-white to-transparent md:static md:bg-none z-10 pb-[calc(1rem+env(safe-area-inset-bottom))]">
-              <div className="max-w-3xl mx-auto">
-                <Button type="submit" size="lg" className="w-full h-16 text-xl shadow-xl font-bold rounded-xl" disabled={mutation.isPending}>
-                  {mutation.isPending ? "Salvando..." : "Salvar Contagem"}
-                </Button>
+                      <div className="rounded-lg border overflow-hidden">
+                        <div className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
+                          <span>Insumo</span>
+                          <span className="text-right">Contagem</span>
+                          {hasProduction && <span className="text-right">Produzido</span>}
+                        </div>
+                        {handover.items.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-3 border-t items-start`}
+                          >
+                            <div>
+                              <span className="font-medium">{item.name}</span>
+                              <span className="text-xs text-muted-foreground ml-1">({item.unit})</span>
+                              {item.production_logs?.map((pl, pIdx) => (
+                                <p key={pIdx} className="text-xs text-muted-foreground mt-0.5">
+                                  {pl.user_name} · {pl.time}
+                                </p>
+                              ))}
+                            </div>
+                            <span className="text-right font-semibold tabular-nums pt-0.5">
+                              {item.counted} {item.unit}
+                            </span>
+                            {hasProduction && (
+                              <span className={`text-right font-semibold tabular-nums pt-0.5 ${
+                                item.produced > 0 ? "text-green-600" : "text-muted-foreground"
+                              }`}>
+                                {item.produced > 0 ? `${item.produced} ${item.unit}` : "—"}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  );
+                })}
               </div>
-            </div>
-          </form>
-        </Form>
+            ))
+          )}
+        </div>
       )}
 
       {reviewState && (

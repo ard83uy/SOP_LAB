@@ -42,16 +42,19 @@ type HandoverGroup = {
   }[];
 };
 
+type ProductionLogEntry = { user_name: string; time: string; quantity: number };
 type ProductionGroup = {
   date: string;
-  logs: {
-    id: string;
-    item_name: string;
-    unit: string;
-    produced_quantity: number;
-    user_name: string;
+  handovers: {
+    handover_id: string;
     station_name: string;
-    time: string;
+    items: {
+      name: string;
+      unit: string;
+      requested: number;
+      produced: number;
+      production_logs: ProductionLogEntry[];
+    }[];
   }[];
 };
 
@@ -613,8 +616,8 @@ function HistoryProduction() {
     return (
       <div className="space-y-3">
         <Skeleton className="h-6 w-28" />
-        <Skeleton className="h-20 rounded-xl" />
-        <Skeleton className="h-20 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
       </div>
     );
   }
@@ -637,32 +640,52 @@ function HistoryProduction() {
   return (
     <div className="space-y-6">
       {groups.map((group) => (
-        <div key={group.date}>
-          <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">
-            {group.date}
-          </p>
-          <div className="space-y-2">
-            {group.logs.map((log) => (
-              <Card key={log.id} className="bg-card">
-                <CardContent className="p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-semibold text-sm">{log.item_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {log.station_name} · {log.user_name}
-                      </p>
+        <div key={group.date} className="space-y-3">
+          <h2 className="text-lg font-bold text-muted-foreground">{group.date}</h2>
+          {group.handovers.map((handover) => {
+            const hasRequested = handover.items.some((i) => i.requested > 0);
+            return (
+              <Card key={handover.handover_id} className="overflow-hidden">
+                <CardContent className="p-4 space-y-3">
+                  <p className="text-sm font-semibold">{handover.station_name}</p>
+                  <div className="rounded-lg border overflow-hidden">
+                    <div className={`grid ${hasRequested ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
+                      <span>Insumo</span>
+                      {hasRequested && <span className="text-right">Pedido</span>}
+                      <span className="text-right">Produzido</span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-bold text-sm text-primary">
-                        {log.produced_quantity} {log.unit}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{log.time}</p>
-                    </div>
+                    {handover.items.map((item, idx) => (
+                      <div key={idx} className={`grid ${hasRequested ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-3 border-t items-start`}>
+                        <div>
+                          <span className="font-medium text-sm">{item.name}</span>
+                          <span className="text-xs text-muted-foreground ml-1">({item.unit})</span>
+                          {item.production_logs.map((pl, pIdx) => (
+                            <p key={pIdx} className="text-xs text-muted-foreground mt-0.5">
+                              {pl.user_name} · {pl.time}
+                            </p>
+                          ))}
+                        </div>
+                        {hasRequested && (
+                          <span className="text-right font-semibold tabular-nums text-sm pt-0.5">
+                            {item.requested > 0 ? `${item.requested} ${item.unit}` : "—"}
+                          </span>
+                        )}
+                        <span className={`text-right font-semibold tabular-nums text-sm pt-0.5 ${
+                          item.produced >= item.requested && item.requested > 0
+                            ? "text-green-600"
+                            : item.produced > 0
+                              ? "text-amber-600"
+                              : "text-muted-foreground"
+                        }`}>
+                          {item.produced > 0 ? `${item.produced} ${item.unit}` : "—"}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+            );
+          })}
         </div>
       ))}
     </div>
