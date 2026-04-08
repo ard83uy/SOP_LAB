@@ -110,3 +110,53 @@ export const updateRecipeSchema = z.object({
 export const createRecipeCommentSchema = z.object({
   text: z.string().min(1).max(2000),
 });
+
+// ── Checklists ──────────────────────────────────────────────────────────────
+
+const checklistTaskSchema = z.object({
+  title: z.string().min(2).max(200),
+  description: z.string().max(1000).optional(),
+  frequency: z.enum(["DAILY", "SPECIFIC_DAYS"]).optional(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).optional(),
+  time_slot: z.enum(["ALL_DAY", "OPENING", "MIDDAY", "CLOSING"]).optional(),
+  sort_order: z.number().int().min(0).optional(),
+  points: z.number().int().min(1).max(100).optional(),
+});
+
+export const createChecklistSchema = z.object({
+  name: z.string().min(2).max(100),
+  description: z.string().max(1000).optional(),
+  profile_ids: z.array(z.string().uuid()).min(1, "Selecione pelo menos 1 perfil"),
+  tasks: z.array(checklistTaskSchema).optional(),
+});
+
+export const updateChecklistSchema = z.object({
+  name: z.string().min(2).max(100).optional(),
+  description: z.string().max(1000).optional(),
+  is_active: z.boolean().optional(),
+  profile_ids: z.array(z.string().uuid()).optional(),
+});
+
+export const createChecklistTaskSchema = checklistTaskSchema;
+
+export const updateChecklistTaskSchema = z.object({
+  title: z.string().min(2).max(200).optional(),
+  description: z.string().max(1000).nullable().optional(),
+  frequency: z.enum(["DAILY", "SPECIFIC_DAYS"]).optional(),
+  days_of_week: z.array(z.number().int().min(0).max(6)).optional(),
+  time_slot: z.enum(["ALL_DAY", "OPENING", "MIDDAY", "CLOSING"]).optional(),
+  sort_order: z.number().int().min(0).optional(),
+  points: z.number().int().min(1).max(100).optional(),
+  is_active: z.boolean().optional(),
+});
+
+export const checklistCompletionSchema = z.object({
+  task_id: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato deve ser YYYY-MM-DD"),
+  note: z.string().max(500).optional(),
+});
+
+export const deleteChecklistCompletionSchema = z.object({
+  task_id: z.string().uuid(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Formato deve ser YYYY-MM-DD"),
+});

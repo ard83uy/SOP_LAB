@@ -17,6 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 type PrepItem = {
   id: string;
@@ -99,19 +100,18 @@ export default function StationPrepItemsPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+      <PageHeader title="Insumos da Praça">
         <div className="flex items-center gap-3">
           <Link href="/admin/stations">
             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
               <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold tracking-tight">Insumos da Praça</h1>
+          <Button onClick={() => setLinkOpen(true)} className="h-10 gap-2">
+            <Plus className="w-4 h-4" /> Vincular Insumo
+          </Button>
         </div>
-        <Button onClick={() => setLinkOpen(true)} className="h-10 gap-2">
-          <Plus className="w-4 h-4" /> Vincular Insumo
-        </Button>
-      </div>
+      </PageHeader>
 
       {/* Link dialog */}
       <Dialog open={linkOpen} onOpenChange={setLinkOpen}>

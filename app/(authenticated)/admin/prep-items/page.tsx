@@ -21,6 +21,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const UNITS = [
@@ -418,14 +419,13 @@ export default function AdminPrepItemsPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6 pb-32">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Insumos</h1>
+      <PageHeader title="Insumos">
         {tab === "catalog" && (
           <Button onClick={openCreate} className="h-10 gap-2">
             <Plus className="w-4 h-4" /> Novo Insumo
           </Button>
         )}
-      </div>
+      </PageHeader>
 
       {/* Tabs */}
       <div className="flex gap-4 border-b">

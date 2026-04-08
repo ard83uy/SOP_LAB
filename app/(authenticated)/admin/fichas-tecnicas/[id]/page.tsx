@@ -23,6 +23,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -373,23 +374,19 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto pb-32 space-y-8">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => router.push("/admin/fichas-tecnicas")}>
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h1 className="text-2xl font-bold truncate">{recipe.name}</h1>
-            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category] ?? ""}`}>
-              {CATEGORY_LABELS[recipe.category]}
-            </span>
-          </div>
-          {recipe.description && (
-            <p className="text-sm text-muted-foreground mt-0.5">{recipe.description}</p>
-          )}
+      <PageHeader title={recipe.name}>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/fichas-tecnicas")}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category] ?? ""}`}>
+            {CATEGORY_LABELS[recipe.category]}
+          </span>
         </div>
-      </div>
+      </PageHeader>
+      {recipe.description && (
+        <p className="text-sm text-muted-foreground -mt-6">{recipe.description}</p>
+      )}
 
       {/* Yield scaler */}
       <Card>

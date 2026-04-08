@@ -45,57 +45,41 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 // ── Types ────────────────────────────────────────────────────────────────────
+
+type Profile = {
+  id: string;
+  name: string;
+};
 
 type User = {
   id: string;
   name: string;
   email: string;
   role: string;
+  profile_id: string | null;
+  profile: Profile | null;
   status: "ACTIVE" | "INACTIVE" | "ONBOARDING";
 };
 
 // ── Schemas ──────────────────────────────────────────────────────────────────
 
-const ROLES = [
-  { value: "STAFF", label: "Funcionário (Contagem)" },
-  { value: "PREP_KITCHEN", label: "Cozinheiro de Produção" },
-  { value: "STATION_LEADER", label: "Líder de Praça" },
-  { value: "MANAGER", label: "Gerente" },
-  { value: "ADMIN", label: "Admin" },
-] as const;
-
 const createSchema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
   email: z.email("E-mail inválido"),
   password: z.string().min(8, "Mínimo 8 caracteres"),
-  role: z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"]),
+  profile_id: z.string().uuid("Selecione um perfil"),
 });
 
 const editSchema = z.object({
   name: z.string().min(2, "Mínimo 2 caracteres"),
-  role: z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"]),
+  profile_id: z.string().uuid("Selecione um perfil"),
   password: z.string().min(8, "Mínimo 8 caracteres").or(z.literal("")).optional(),
 });
 
-// ── Role / status display ────────────────────────────────────────────────────
-
-const roleLabel: Record<string, string> = {
-  ADMIN: "Admin",
-  MANAGER: "Gerente",
-  STATION_LEADER: "Líder de Praça",
-  PREP_KITCHEN: "Produção",
-  STAFF: "Funcionário",
-};
-
-const roleBadgeClass: Record<string, string> = {
-  ADMIN: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-  MANAGER: "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300",
-  STATION_LEADER: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-  PREP_KITCHEN: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-  STAFF: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-};
+// ── Status display ──────────────────────────────────────────────────────────
 
 const statusBadgeClass: Record<string, string> = {
   ACTIVE: "border-green-500 text-green-700 dark:text-green-400",
@@ -109,21 +93,50 @@ const statusLabel: Record<string, string> = {
   ONBOARDING: "Pendente",
 };
 
+// ── Profile Select ──────────────────────────────────────────────────────────
+
+function ProfileSelect({
+  profiles,
+  value,
+  onChange,
+}: {
+  profiles: Profile[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <Select onValueChange={(v) => { if (v) onChange(v); }} value={value}>
+      <SelectTrigger className="h-12">
+        <SelectValue placeholder="Selecione o perfil" />
+      </SelectTrigger>
+      <SelectContent>
+        {profiles.map((p) => (
+          <SelectItem key={p.id} value={p.id}>
+            {p.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 // ── Create Dialog ─────────────────────────────────────────────────────────────
 
 function CreateUserDialog({
   open,
   onOpenChange,
+  profiles,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
+  profiles: Profile[];
 }) {
   const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof createSchema>>({
     resolver: zodResolver(createSchema),
-    defaultValues: { name: "", email: "", password: "", role: "STAFF" },
+    defaultValues: { name: "", email: "", password: "", profile_id: "" },
   });
 
   const mutation = useMutation({
@@ -141,6 +154,7 @@ function CreateUserDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profiles"] });
       toast.success("Usuário criado com sucesso!");
       onOpenChange(false);
       form.reset();
@@ -211,24 +225,17 @@ function CreateUserDialog({
             />
             <FormField
               control={form.control}
-              name="role"
+              name="profile_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Função</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="Selecione a função" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ROLES.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Perfil</FormLabel>
+                  <FormControl>
+                    <ProfileSelect
+                      profiles={profiles}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -248,21 +255,30 @@ function CreateUserDialog({
 function EditUserDialog({
   user,
   onClose,
+  profiles,
 }: {
   user: User;
   onClose: () => void;
+  profiles: Profile[];
 }) {
   const queryClient = useQueryClient();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<z.infer<typeof editSchema>>({
     resolver: zodResolver(editSchema),
-    defaultValues: { name: user.name, role: user.role as any, password: "" },
+    defaultValues: {
+      name: user.name,
+      profile_id: user.profile_id ?? "",
+      password: "",
+    },
   });
 
   const mutation = useMutation({
     mutationFn: async (data: z.infer<typeof editSchema>) => {
-      const body: Record<string, unknown> = { name: data.name, role: data.role };
+      const body: Record<string, unknown> = {
+        name: data.name,
+        profile_id: data.profile_id,
+      };
       if (data.password) body.password = data.password;
       const res = await fetch(`/api/users/${user.id}`, {
         method: "PATCH",
@@ -277,6 +293,7 @@ function EditUserDialog({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profiles"] });
       toast.success("Usuário atualizado!");
       onClose();
     },
@@ -306,24 +323,17 @@ function EditUserDialog({
             />
             <FormField
               control={form.control}
-              name="role"
+              name="profile_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Função</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-12">
-                        <SelectValue />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {ROLES.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Perfil</FormLabel>
+                  <FormControl>
+                    <ProfileSelect
+                      profiles={profiles}
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -430,6 +440,15 @@ export default function TeamPage() {
     },
   });
 
+  const { data: profiles } = useQuery<Profile[]>({
+    queryKey: ["team-profiles"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-profiles");
+      if (!res.ok) throw new Error("Falha ao carregar perfis");
+      return (await res.json()).map((p: any) => ({ id: p.id, name: p.name }));
+    },
+  });
+
   const suspendMutation = useMutation({
     mutationFn: async ({ id, suspended }: { id: string; suspended: boolean }) => {
       const res = await fetch(`/api/users/${id}`, {
@@ -462,6 +481,7 @@ export default function TeamPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["team"] });
+      queryClient.invalidateQueries({ queryKey: ["user-profiles"] });
       toast.success("Usuário excluído.");
       setConfirmAction(null);
     },
@@ -484,8 +504,7 @@ export default function TeamPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Equipe</h1>
+      <PageHeader title="Equipe">
         <Button
           onClick={() => setCreateOpen(true)}
           size="icon"
@@ -496,7 +515,7 @@ export default function TeamPage() {
             <UserPlus className="w-5 h-5" /> Novo Funcionário
           </span>
         </Button>
-      </div>
+      </PageHeader>
 
       {isLoading ? (
         <div className="space-y-3">
@@ -533,9 +552,9 @@ export default function TeamPage() {
                     <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                     <Badge
                       variant="secondary"
-                      className={`text-xs ${roleBadgeClass[user.role] || ""}`}
+                      className="text-xs"
                     >
-                      {roleLabel[user.role] ?? user.role}
+                      {user.profile?.name ?? "Sem perfil"}
                     </Badge>
                   </div>
 
@@ -579,9 +598,19 @@ export default function TeamPage() {
         </div>
       )}
 
-      <CreateUserDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateUserDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        profiles={profiles ?? []}
+      />
 
-      {editUser && <EditUserDialog user={editUser} onClose={() => setEditUser(null)} />}
+      {editUser && (
+        <EditUserDialog
+          user={editUser}
+          onClose={() => setEditUser(null)}
+          profiles={profiles ?? []}
+        />
+      )}
 
       {confirmAction && (
         <ConfirmDialog

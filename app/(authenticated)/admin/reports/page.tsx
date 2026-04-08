@@ -1,13 +1,12 @@
+"use client";
+
 import { PieChart, Loader2 } from "lucide-react";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 export default function ReportsPage() {
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 font-display">
-          Relatórios
-        </h1>
-      </div>
+    <div className="p-6 md:p-8 max-w-5xl mx-auto space-y-6">
+      <PageHeader title="Relatórios" />
 
       <div className="bg-white rounded-3xl p-8 shadow-xl shadow-slate-200/50 flex flex-col items-center justify-center text-center space-y-6 min-h-[400px]">
         <div className="bg-blue-50 p-6 rounded-full">

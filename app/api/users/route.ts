@@ -13,6 +13,7 @@ async function listUsersHandler(req: AppRequest) {
 
   const users = await prisma.user.findMany({
     where: { tenant_id },
+    include: { profile: { select: { id: true, name: true } } },
     orderBy: { created_at: "asc" },
   });
 
@@ -23,20 +24,29 @@ const createUserSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
   email: z.email("E-mail inválido"),
   password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
-  role: z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"]),
+  profile_id: z.string().uuid("Perfil inválido"),
 });
 
 async function createUserHandler(req: AppRequest) {
-  const { name, email, password, role } = req.ctx.parsedBody;
+  const { name, email, password, profile_id } = req.ctx.parsedBody;
   const tenant_id = req.ctx.tenant_id!;
 
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: tenant_id },
-    include: { _count: { select: { users: true } } },
-  });
+  const [tenant, profile] = await Promise.all([
+    prisma.tenant.findUnique({
+      where: { id: tenant_id },
+      include: { _count: { select: { users: true } } },
+    }),
+    prisma.userProfile.findFirst({
+      where: { id: profile_id, tenant_id },
+    }),
+  ]);
 
   if (!tenant) {
     return NextResponse.json({ error: "Tenant not found", code: "NOT_FOUND" }, { status: 404 });
+  }
+
+  if (!profile) {
+    return NextResponse.json({ error: "Perfil não encontrado", code: "NOT_FOUND" }, { status: 404 });
   }
 
   if (tenant._count.users >= tenant.max_employees) {
@@ -70,14 +80,15 @@ async function createUserHandler(req: AppRequest) {
     data: {
       clerk_user_id: clerkUser.id,
       tenant_id,
-      role,
+      role: profile.base_role,
+      profile_id,
       name,
       email,
       status: "ACTIVE",
     },
   });
 
-  req.logger.info({ new_user_id: user.id, email, role }, "User created");
+  req.logger.info({ new_user_id: user.id, email, profile_id, role: profile.base_role }, "User created");
   return NextResponse.json(user, { status: 201 });
 }
 

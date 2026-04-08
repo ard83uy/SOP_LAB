@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { IconPicker } from "@/components/icon-picker";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const createStationSchema = z.object({
   name: z.string().min(2, "Nome deve ter no mínimo 2 caracteres").max(100),
@@ -181,8 +182,7 @@ export default function StationsPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Praças</h1>
+      <PageHeader title="Praças">
         {mounted && canCreate && (
           <Button
             onClick={() => setOpen(true)}
@@ -195,50 +195,51 @@ export default function StationsPage() {
             </span>
           </Button>
         )}
+      </PageHeader>
 
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Nova Praça</DialogTitle>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Nome da Praça</FormLabel>
-                      <FormControl>
-                        <Input className="h-12 text-lg" placeholder="Ex: Grelha, Salada..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="icon"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ícone</FormLabel>
-                      <FormControl>
-                        <IconPicker
-                          value={field.value}
-                          onSelect={(icon) => field.onChange(icon)}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full h-12 text-lg" disabled={mutation.isPending}>
-                  {mutation.isPending ? "Salvando..." : "Salvar Praça"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Praça</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nome da Praça</FormLabel>
+                    <FormControl>
+                      <Input className="h-12 text-lg" placeholder="Ex: Grelha, Salada..." {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="icon"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ícone</FormLabel>
+                    <FormControl>
+                      <IconPicker
+                        value={field.value}
+                        onSelect={(icon) => field.onChange(icon)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full h-12 text-lg" disabled={mutation.isPending}>
+                {mutation.isPending ? "Salvando..." : "Salvar Praça"}
+              </Button>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
         <Dialog open={!!editStation} onOpenChange={(o) => !o && setEditStation(null)}>
           <DialogContent>
@@ -283,7 +284,6 @@ export default function StationsPage() {
             </Form>
           </DialogContent>
         </Dialog>
-      </div>
 
       {isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

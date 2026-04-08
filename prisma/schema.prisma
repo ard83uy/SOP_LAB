@@ -33,12 +33,15 @@ model Tenant {
   created_at     DateTime        @default(now())
 
   users          User[]
+  userProfiles   UserProfile[]
   stations       Station[]
   shiftHandovers ShiftHandover[]
   prepItems      PrepItem[]
   productionLogs ProductionLog[]
   prepItemRequests PrepItemRequest[]
   recipes        Recipe[]
+  checklists     Checklist[]
+  checklistCompletions ChecklistCompletion[]
 }
 
 model User {
@@ -46,16 +49,35 @@ model User {
   clerk_user_id  String          @unique
   tenant_id      String          @db.Uuid
   role           UserRole
+  profile_id     String?         @db.Uuid
   name           String
   email          String
   status         UserStatus      @default(ONBOARDING)
   created_at     DateTime        @default(now())
 
   tenant         Tenant          @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  profile        UserProfile?    @relation(fields: [profile_id], references: [id], onDelete: SetNull)
   shiftHandovers   ShiftHandover[]
   productionLogs   ProductionLog[]
   prepItemRequests PrepItemRequest[]
   recipeComments   RecipeComment[]
+  createdChecklists  Checklist[]
+  checklistCompletions ChecklistCompletion[]
+}
+
+model UserProfile {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenant_id       String   @db.Uuid
+  name            String
+  base_role       UserRole @default(STAFF)
+  allowed_modules Json     @default("{}")
+  created_at      DateTime @default(now())
+
+  tenant      Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  users       User[]
+  checklists  Checklist[]
+
+  @@unique([tenant_id, name])
 }
 
 model Station {
@@ -171,6 +193,18 @@ enum RequestStatus {
   REJECTED
 }
 
+enum ChecklistFrequency {
+  DAILY
+  SPECIFIC_DAYS
+}
+
+enum TimeSlot {
+  ALL_DAY
+  OPENING
+  MIDDAY
+  CLOSING
+}
+
 enum RecipeCategory {
   PRIMARY       // Produtos primários
   MANIPULATED   // Produtos manipulados (ovo cozido, muzzarella ralada, etc.)
@@ -234,4 +268,57 @@ model RecipeComment {
 
   recipe           Recipe    @relation(fields: [recipe_id], references: [id], onDelete: Cascade)
   user             User      @relation(fields: [user_id], references: [id])
+}
+
+// ─── Checklists ──────────────────────────────────────────────
+
+model Checklist {
+  id              String    @id @default(uuid()) @db.Uuid
+  tenant_id       String    @db.Uuid
+  name            String
+  description     String?
+  is_active       Boolean   @default(true)
+  created_by      String    @db.Uuid
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+
+  tenant          Tenant    @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  creator         User      @relation(fields: [created_by], references: [id])
+  tasks           ChecklistTask[]
+  profiles        UserProfile[]
+
+  @@unique([tenant_id, name])
+}
+
+model ChecklistTask {
+  id              String             @id @default(uuid()) @db.Uuid
+  checklist_id    String             @db.Uuid
+  title           String
+  description     String?
+  frequency       ChecklistFrequency @default(DAILY)
+  days_of_week    Int[]              // 0=dom, 6=sáb — usado quando frequency = SPECIFIC_DAYS
+  time_slot       TimeSlot           @default(ALL_DAY)
+  sort_order      Int                @default(0)
+  points          Int                @default(1)
+  is_active       Boolean            @default(true)
+  created_at      DateTime           @default(now())
+
+  checklist       Checklist          @relation(fields: [checklist_id], references: [id], onDelete: Cascade)
+  completions     ChecklistCompletion[]
+}
+
+model ChecklistCompletion {
+  id              String    @id @default(uuid()) @db.Uuid
+  task_id         String    @db.Uuid
+  user_id         String    @db.Uuid
+  tenant_id       String    @db.Uuid
+  date            String    // "YYYY-MM-DD" — timezone resolvido no app
+  completed_at    DateTime  @default(now())
+  note            String?
+
+  task            ChecklistTask @relation(fields: [task_id], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [user_id], references: [id])
+  tenant          Tenant        @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@unique([task_id, user_id, date])
 }

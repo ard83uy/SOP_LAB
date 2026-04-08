@@ -22,6 +22,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 // ── Types & constants ────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Unidade</label>
-              <Select value={form.yield_unit} onValueChange={(v) => setForm((f) => ({ ...f, yield_unit: v }))}>
+              <Select value={form.yield_unit} onValueChange={(v) => v && setForm((f) => ({ ...f, yield_unit: v }))}>
                 <SelectTrigger className="h-12 text-base">
                   <SelectValue />
                 </SelectTrigger>
@@ -278,12 +279,11 @@ export default function FichasTecnicasPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6 pb-32">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">Fichas Técnicas</h1>
+      <PageHeader title="Fichas Técnicas">
         <Button onClick={() => setCreateOpen(true)} className="h-10 gap-2">
           <Plus className="w-4 h-4" /> Nova Ficha
         </Button>
-      </div>
+      </PageHeader>
 
       {/* Category tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-border pb-px -mb-px">

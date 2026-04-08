@@ -4,7 +4,34 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useClerk } from "@clerk/nextjs";
-import { ClipboardList, ChefHat, Users, LayoutDashboard, Loader2, LogOut, Package, BookOpen } from "lucide-react";
+import {
+  ClipboardList,
+  CheckSquare,
+  ChefHat,
+  Settings,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+  Package,
+  BookOpen,
+  type LucideIcon,
+} from "lucide-react";
+
+// All possible nav entries, keyed by module name
+// adminHref: overrides href for ADMIN/MANAGER roles
+const MODULE_LINKS: Record<string, { href: string; adminHref?: string; label: string; icon: LucideIcon }> = {
+  stations:   { href: "/admin/stations",   label: "Praças",     icon: LayoutDashboard },
+  handover:   { href: "/staff/handover",   label: "Contagem",   icon: ClipboardList },
+  production: { href: "/staff/production", label: "Produção",   icon: ChefHat },
+  prep_items: { href: "/admin/prep-items", label: "Insumos",    icon: Package },
+  fichas:     { href: "/staff/fichas",     label: "Fichas",     icon: BookOpen },
+  checklists: { href: "/staff/checklists", adminHref: "/admin/checklists", label: "Checklists", icon: CheckSquare },
+  settings:   { href: "/admin/settings",   label: "Config",     icon: Settings },
+};
+
+// Fallback for ADMIN/MANAGER with no profile (all modules)
+// stations is accessed via Config, not the bottom nav for admin
+const ADMIN_MODULES = ["handover", "production", "prep_items", "fichas", "checklists", "settings"];
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -29,32 +56,36 @@ export function BottomNav() {
 
   if (!user) return null;
 
-  const role = user.role;
-
   const getLinks = () => {
-    switch (role) {
-      case "ADMIN":
-      case "MANAGER":
-        return [
-          { href: "/admin/stations", label: "Praças", icon: LayoutDashboard },
-          { href: "/staff/handover", label: "Contagem", icon: ClipboardList },
-          { href: "/staff/production", label: "Produção", icon: ChefHat },
-          { href: "/admin/prep-items", label: "Insumos", icon: Package },
-          { href: "/admin/fichas-tecnicas", label: "Fichas", icon: BookOpen },
-          { href: "/admin/team", label: "Equipe", icon: Users },
-        ];
-      case "STATION_LEADER":
-      case "STAFF":
-        return [
-          { href: "/staff/handover", label: "Contagem", icon: ClipboardList },
-        ];
-      case "PREP_KITCHEN":
-        return [
-          { href: "/staff/production", label: "Produção", icon: ChefHat },
-        ];
-      default:
-        return [];
+    const role: string = user.role;
+    const modules: Record<string, boolean> = user.profile?.allowed_modules ?? {};
+    const isAdmin = role === "ADMIN" || role === "MANAGER";
+
+    const resolveLink = (key: string) => {
+      const entry = MODULE_LINKS[key];
+      if (!entry) return null;
+      // For admin/manager roles, use adminHref if available; also skip stations (it lives in Config)
+      if (isAdmin) {
+        if (key === "stations") return null; // accessed via /admin/settings
+        const href = entry.adminHref ?? entry.href;
+        return { ...entry, href };
+      }
+      return entry;
+    };
+
+    // ADMIN/MANAGER: if no profile, show everything; otherwise respect profile
+    if (isAdmin) {
+      const keys = Object.keys(modules).length > 0
+        ? ADMIN_MODULES.filter((m) => modules[m])
+        : ADMIN_MODULES;
+      return keys.map(resolveLink).filter(Boolean) as typeof MODULE_LINKS[string][];
     }
+
+    // Everyone else: driven entirely by profile allowed_modules
+    return Object.entries(modules)
+      .filter(([, enabled]) => enabled)
+      .map(([key]) => resolveLink(key))
+      .filter(Boolean) as typeof MODULE_LINKS[string][];
   };
 
   const links = getLinks();
@@ -65,7 +96,8 @@ export function BottomNav() {
       <div className="flex items-center justify-around h-16 px-1">
         {links.map((link) => {
           const Icon = link.icon;
-          const isActive = pathname.startsWith(link.href);
+          const isActive = pathname.startsWith(link.href) ||
+            (link.adminHref ? pathname.startsWith(link.adminHref) : false);
           return (
             <Link
               key={link.href}

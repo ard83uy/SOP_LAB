@@ -10,7 +10,10 @@ async function getMeHandler(req: AppRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: user_id, tenant_id },
-    include: { tenant: true }
+    include: {
+      tenant: true,
+      profile: { select: { id: true, name: true, base_role: true, allowed_modules: true } },
+    },
   });
 
   return NextResponse.json(user);

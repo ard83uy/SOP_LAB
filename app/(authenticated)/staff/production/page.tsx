@@ -16,6 +16,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -718,13 +719,20 @@ function HistoryView() {
 export default function ProductionPage() {
   const [tab, setTab] = useState<"producao" | "historico">("producao");
 
+  const getTitle = () => {
+    if (tab === "producao") return "Dashboard de Produção";
+    return "Histórico de Produção";
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold tracking-tight mb-4">
-        {tab === "producao" ? "Dashboard de Produção" : "Histórico"}
-      </h1>
+      <PageHeader title={getTitle()} />
       <TabBar active={tab} onChange={setTab} />
-      {tab === "producao" ? <ProductionDashboard /> : <HistoryView />}
+      {tab === "producao" ? (
+        <ProductionDashboard />
+      ) : (
+        <HistoryView />
+      )}
     </div>
   );
 }

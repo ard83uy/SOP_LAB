@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SOP Mobile
 
-## Getting Started
+> Gestão operacional de restaurantes — Back-of-House, Mobile-First, Multi-tenant.
 
-First, run the development server:
+SOP Mobile digitaliza a troca de turno de cozinhas: cozinheiros contam os insumos da praça ao sair, a produção vê em tempo real o que precisa preparar. Cria accountability, elimina conflitos entre turnos.
+
+---
+
+## Stack
+
+| Camada | Tecnologia |
+|--------|-----------|
+| Framework | Next.js 16.x (App Router) |
+| Database | PostgreSQL via Railway |
+| ORM | Prisma 6.x |
+| Auth | Clerk |
+| Styling | Tailwind CSS v4 + shadcn (base-ui) |
+| State | TanStack React Query 5.x |
+| Deploy | Railway (GitOps) |
+
+---
+
+## Desenvolvimento Local
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+O projeto conecta diretamente ao banco de dev no Railway (sem banco local).
+Configure o `.env` com:
+```
+DATABASE_URL=postgresql://...   # Railway Dev DB
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Migrations
 
-## Learn More
+```bash
+# Nova migration
+npx prisma migrate dev --name nome_da_mudanca
 
-To learn more about Next.js, take a look at the following resources:
+# Aplicar em staging/prod
+npx prisma migrate deploy
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Estrutura do Projeto
 
-## Deploy on Vercel
+```
+app/
+  api/                    # API Routes (Next.js)
+    users/                # CRUD usuários
+    user-profiles/        # Perfis de usuário
+    stations/             # Praças
+    prep-items/           # Insumos
+    handovers/            # Contagem de turno
+    production/           # Dashboard e logs de produção
+    recipes/              # Fichas técnicas
+  (authenticated)/        # Páginas protegidas
+    admin/
+      stations/           # Gestão de praças
+      prep-items/         # Catálogo de insumos
+      team/               # Gestão de equipe
+      fichas-tecnicas/    # Fichas técnicas (admin)
+      settings/           # Configurações do sistema
+        profiles/         # Perfis de usuário
+    staff/
+      handover/           # Contagem de turno
+      production/         # Dashboard de produção
+      fichas/             # Fichas técnicas (staff)
+components/
+  layout/                 # BottomNav, PageHeader, EmptyState
+  ui/                     # shadcn components (base-ui)
+lib/
+  middlewares/            # compose, withAuth, withTenant, withRole, withModule, withValidation
+  prisma.ts               # PrismaClient singleton
+  timezone.ts             # Helpers America/Sao_Paulo
+  validations/schemas.ts  # Zod schemas compartilhados
+prisma/
+  schema.prisma           # Data model
+  migrations/             # Histórico de migrations
+docs/
+  01_PRD.md               # Product Requirements
+  02_SPECS.md             # Technical Specifications (fonte de verdade)
+  03_BACKLOG.md           # Backlog e histórico de features
+  DEPLOY_GUIDE.md         # Guia de deploy e infraestrutura
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Conceitos-chave
+
+### Perfis de Usuário
+Cada colaborador tem um **Perfil** (criado pelo gerente em Configurações → Perfis). O perfil define:
+- **Nome da função** (ex: "Barista", "Cozinheiro de Produção")
+- **Nível de acesso** (`base_role`: ADMIN, MANAGER, STATION_LEADER, STAFF)
+- **Módulos visíveis** (`allowed_modules`): quais telas aparecem no menu
+
+O `BottomNav` é gerado dinamicamente pelos `allowed_modules` do perfil.
+
+### Middleware Stack
+```ts
+compose(withAuth, withTenant, withRole(["ADMIN", "MANAGER"]), withValidation(schema), handler)
+```
+Toda rota de API usa `compose()` de `lib/middlewares/`.
+
+### Multi-tenancy
+Todo acesso ao banco inclui `where: { tenant_id }`. Nunca acessar dados sem filtro de tenant.
+
+---
+
+## Deploy
+
+Ver [docs/DEPLOY_GUIDE.md](docs/DEPLOY_GUIDE.md) para instruções completas.
+
+**Fluxo resumido:** `feature/*` → PR → `beta` (auto-deploy Railway Staging) → PR → `main` (auto-deploy Railway Prod)
+
+⚠️ **Nunca commitar diretamente em `beta` ou `main` sem autorização explícita do usuário.**

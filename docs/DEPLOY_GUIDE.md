@@ -1,137 +1,206 @@
-# Guia de Deploy e Operação (SOP Mobile)
+# Guia de Deploy e Operação — SOP Mobile
 
-Este documento foi criado para guiar a configuração de infraestrutura, bancos de dados e domínios da plataforma SOP. Ele foca no fluxo **GitOps** com deploy automatizado via Railway e isolamento de ambientes (Beta staging e Production).
+> **Última atualização:** 2026-04-08
 
----
-
-## Capítulo 1: Pré-requisitos
-
-Para completar este guia sem impedimentos, valide que possui as seguintes contas criadas com permissões de administrador:
-
-- **Conta no GitHub:** Para hospedar o repositório (`main` e `beta` branches).
-- **Conta no Railway (`railway.app`):** Para rodar a aplicação em Cloud, gerenciar bancos PostgreSQL e auto-deploys.
-- **Conta no Clerk (`clerk.com`):** Para autenticação e Single Sign On (SSO). O Clerk exige que você crie _pelo menos duas instâncias_ no Dashboard (ou separe Keys de Desenvolvimento vs. Keys de Produção Live).
+Este documento descreve a infraestrutura, fluxo GitOps e operações de manutenção da plataforma SOP Mobile.
 
 ---
 
-## Capítulo 2: Configuração do GitHub
+## Capítulo 1: Visão Geral da Infraestrutura
 
-1. Inicialize ou empurre seu projeto em um repositório remoto:
-   ```bash
-   git add .
-   git commit -m "feat: initial MVP setup"
-   git branch -M main
-   git remote add origin https://github.com/SEU_USUARIO/sop-mobile.git
-   git push -u origin main
+### 3 Ambientes
+
+| Tier | Branch Git | Railway Project | Banco | Clerk Instance |
+|------|-----------|----------------|-------|----------------|
+| **Dev (Local)** | `feature/*` | — | PostgreSQL Dev (Railway) | Development |
+| **Beta (Staging)** | `beta` | `sop-beta` | PostgreSQL Beta | Development |
+| **Production** | `main` | `sop-prod` | PostgreSQL Prod | Production |
+
+### Componentes por ambiente
+- **Web Service:** Next.js rodando no Railway (Node.js runtime)
+- **Database:** PostgreSQL gerenciado pelo Railway (conexão via `DATABASE_URL`)
+- **Auth:** Clerk (instâncias separadas Dev vs Prod)
+
+---
+
+## Capítulo 2: Pré-requisitos
+
+- **GitHub:** repositório com branches `main` (protegida) e `beta`
+- **Railway:** conta com dois projetos separados (beta e prod)
+- **Clerk:** dois applications — Development (beta) e Production (prod)
+
+---
+
+## Capítulo 3: Setup Inicial — Ambiente Beta
+
+1. **Novo projeto Railway** → Deploy from GitHub → selecionar repo → branch `beta`
+2. **Adicionar PostgreSQL:** botão direito no canvas → Create Database → PostgreSQL
+3. **Env vars no serviço web:**
    ```
-
-2. Crie a branch `beta` e faça o push:
-   ```bash
-   git checkout -b beta
-   git push -u origin beta
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+   CLERK_SECRET_KEY=sk_test_...
+   NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+   NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
+   NODE_ENV=beta
    ```
+4. **Rodar migrations:**
+   ```bash
+   railway link  # aponta para o projeto beta
+   railway run npx prisma migrate deploy
+   ```
+5. **Seed de dados de teste:**
+   ```bash
+   railway run npx prisma db seed
+   ```
+   O seed cria o tenant "La Barbara" com perfis padrão (Admin, Gerente, Líder de Praça, Cozinheiro de Produção, Funcionário).
 
-3. **Branch Protection:**
-   - Acesse Settings > Branches no repositório.
-   - Adicione uma regra para proteger a branch `main`:
-     - Exija no mínimo 1 aprovação em Pull Requests (PR).
-     - Bloqueie push direto em `main` (força o time a enviar mudanças via `beta`).
-
----
-
-## Capítulo 3: Configuração do Railway (Ambiente Beta / Staging)
-
-Crieremos o ambiente onde a gerência valida e testa as modificações sem impactar as filiais.
-
-1. Faça login no Railway, clique em **"New Project"**, selecione **"Deploy from GitHub repo"** e escolha o repositório `sop-mobile`.
-2. Após o deploy inicial falhar (pois falta DB), clique com o botão direito no canvas do projeto > **"Create Database"** > **"Add PostgreSQL"**.
-3. Associe o banco gerado ao serviço web. O Railway conectará os containers automaticamente e injetará a variável genérica `DATABASE_URL`.
-4. Vá em **Project Settings > Deployments** no painel da aplicação NextJS. Confirme se a trigger source aponta **EXATAMENTE e SOMENTE** para a branch `beta`.
-5. Colete as variáveis do `Clerk (Development)` e insira nas _Environment Variables_ do serviço Web no Railway:
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL`
-   - `NEXT_PUBLIC_CLERK_SIGN_UP_URL`
-   - E configure: `NODE_ENV="beta"`
-
-### 6. Executando as Migrations e Seeding do Staging
-Por se tratar do primeiro deploy, o banco recém-criado está vazio.
-- Instale a cli: `npm i -g @railway/cli`. Conecte na conta: `railway login`. Faça link com seu projeto Beta: `railway link`.
-- Execute a migration apontando localmente a variável para a cloud do railway:
-  ```bash
-  # CUIDADO: você fará overwrite para fins de atalho, alternativamente:
-  railway run npx prisma migrate deploy
-  ```
-- Logo após as tabelas subirem, alimente com os dados teste (incluindo o Tenant 'Restaurante Demo' e dezenas de insumos):
-  ```bash
-  railway run npx prisma db seed
-  ```
-
-7. **Testando:** Acesse a url provida pelo Railway finalizando com `/api/health`. Você deve receber JSON com data, healthy 200, e "environment: beta".
+6. **Verificar:** `GET /api/health` deve retornar `{ healthy: true, environment: "beta" }`
 
 ---
 
-## Capítulo 4: Configuração do Railway (Ambiente Production)
+## Capítulo 4: Setup Inicial — Ambiente Production
 
-Cria-se um **isolamento físico completo** para produção, impedindo cruzamento acidental de chaves, logs e tabelas.
-
-1. Vá à tela inicial e crie um **NOVO PROJETO** Railway.
-2. Selecione **"Deploy from GitHub Repo"** com o MESMO `sop-mobile`.
-3. Configure a branch trigger _EXCLUSIVAMENTE_ para a `main`. Se houver commit na main, ela auto-sobe.
-4. Conecte um novo PostgreSQL à lá carte da mesma maneira (isso gera um servidor fisicamente distinto com outra Connection String).
-5. Defina nas variáveis web as strings copiadas do Clerk (Production):
-   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
-   - `CLERK_SECRET_KEY`
-   - `NODE_ENV="production"`
-6. Na interface via cli digite `railway run npx prisma migrate deploy` no diretório lincado de prod.
-   - **NUNCA DE ENTRADA NO SEED NESTE AMBIENTE.** Clientes preencherão seus próprios restaurantes manualmente após signup.
+1. **Novo projeto Railway separado** → Deploy from GitHub → branch `main` (somente)
+2. **Adicionar PostgreSQL** (banco físico separado)
+3. **Env vars com chaves Production do Clerk:**
+   ```
+   NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_live_...
+   CLERK_SECRET_KEY=sk_live_...
+   NODE_ENV=production
+   ```
+4. **Rodar migrations:**
+   ```bash
+   railway link  # aponta para o projeto prod
+   railway run npx prisma migrate deploy
+   ```
+   ⚠️ **NUNCA rodar seed em produção.** Clientes criam seus próprios dados.
 
 ---
 
 ## Capítulo 5: Fluxo de Trabalho Diário (GitOps)
 
-Este fluxo protege a camada produtiva automatizada contra downtime induzido por humanos.
+```
+feature branch
+     │
+     ▼  PR + merge
+   beta  ──────────────────→  Railway Beta (auto-deploy)
+     │                              │
+     │    QA OK                     │  testar em staging
+     ▼  PR + merge                  ▼
+   main  ──────────────────→  Railway Production (auto-deploy)
+```
 
-1. **Desenvolvimento Local:**
-   ```bash
-   git checkout beta
-   git checkout -b feature/minha-feature
-   ```
-   *Se quiser testar os inserts, você programa plugado em dev e executa npm run dev localmente.*
-   
-2. **Merge em Beta (Test):**
-   - Suba o seu commit (`git push origin feature/minha-feature`).
-   - Vá no GH e abra um Pull Request para a brach **beta**.
-   - Assim que der o *Merge Pull Request* no GitHub, o gatilho da Webhook do Railway escuta e joga para Deploy automático no ambiente Staging. 
+### Passo a passo
 
-3. **Rollout (Production):**
-   - O Time de qualidade testou na URL Beta e está polido?
-   - Crie Novo Pull Request no GitHub da branch `beta` **PARA** `main`.
-   - Após revisão e aprovação final da gerência, o Merge dispara o webHook de Produção. Downtime Zero via arquitetura nativa NIXPACKS do Railway. O front entra em ar na praça.
+```bash
+# 1. Criar feature branch a partir de beta
+git checkout beta && git pull
+git checkout -b feature/minha-feature
+
+# 2. Desenvolver localmente
+npm run dev  # conecta no banco de dev (Railway Dev)
+
+# 3. Quando tiver migrations novas
+npx prisma migrate dev --name descricao_da_mudanca
+
+# 4. Abrir PR → beta
+git push origin feature/minha-feature
+# No GitHub: PR feature/* → beta
+
+# 5. Merge em beta → deploy automático Railway Beta
+# Testar na URL de staging
+
+# 6. Quando aprovado: PR beta → main
+# Merge → deploy automático Railway Prod
+```
 
 ---
 
-## Capítulo 6: Troubleshooting (Resolução Rápida)
+## Capítulo 6: Migrations em Produção
 
-- **Logs Estão Faltando ou Build Falhou?**
-  Para logs do Build ou Aplicação Runtime, navegue até a UI do projeto web no Railway -> aba `Deployments` -> Clique no log output (View Logs).
+Toda nova migration é aplicada automaticamente no deploy via o `postinstall` / build do Railway.
 
-- **O Deploy subiu legal, mas recebo Erro 500 no Banco (Prisma Init Error). O que houve?**
-  Se as tabelas local e online perderam sync (geralmente caso de falta do trigger no build command extra `prisma generate`), certifieque-se se rodou as migrações mais recentes no banco alvo da web:
-  ```bash
-  # Na console local, forçando a var remoto (substitua URL_AQUI)
-  DATABASE_URL="postgres://URL_AQUI" npx prisma migrate deploy
-  ```
-  Isso resolve "Relation X does not exist".
+Para migrations manuais de emergência:
+```bash
+railway link  # selecionar projeto prod
+railway run npx prisma migrate deploy
+```
 
-- **Como faço um Rollback de Desastre?**
-  A feature na produção quebrou. 
-  Opção 1: Railway Dashboard -> Encontre a caixa verde (build successful anterior que funcionava) -> Opções -> Revert to this Build.
-  Opção 2: Pelo GH, dê um Revert do último commit merge no GH e faça Push. O webHook rodará a anterior e auto-limpará a má-decisão em <3min.
+### Migrações aplicadas até hoje
+| Data | Migration | Descrição |
+|------|-----------|-----------|
+| 2026-04-07 | `initial_setup` | Schema completo MVP |
+| 2026-04-08 | `add_user_profiles` | Modelo UserProfile + profile_id no User |
+| 2026-04-08 | `add_base_role_to_profiles` | Campo base_role no UserProfile |
+| 2026-04-08 | `add_allowed_modules_to_profiles` | Campo allowed_modules no UserProfile |
 
-- **Acessando Prisma Studio (Editor visual visual SQL) no Ambiente em Nuvem:**
-  Se o CEO quiser ver algum insumo bugado sem codar SQL:
-  ```bash
-  railway run npx prisma studio
-  # Opcional caso use variavel direta exportando antes: DATABASE_URL=".." npx prisma studio
-  ```
+---
+
+## Capítulo 7: Seed de Perfis Padrão
+
+Ao criar um novo tenant, o gerente deve criar os perfis relevantes em Configurações → Perfis.
+
+Para ambientes de teste, o script abaixo cria os perfis padrão para um tenant existente:
+
+```bash
+npx tsx scripts/seed-profiles.ts <tenant_id>
+```
+
+Perfis padrão e seus módulos:
+| Perfil | base_role | Módulos |
+|--------|-----------|---------|
+| Admin | ADMIN | todos |
+| Gerente | MANAGER | todos |
+| Líder de Praça | STATION_LEADER | handover, fichas |
+| Cozinheiro de Produção | STATION_LEADER | production, fichas |
+| Funcionário | STAFF | handover, fichas |
+
+---
+
+## Capítulo 8: Variáveis de Ambiente
+
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `DATABASE_URL` | Sim | PostgreSQL connection string (injetada pelo Railway) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Sim | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Sim | Clerk secret key |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Sim | `/sign-in` |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Sim | `/sign-up` |
+| `NODE_ENV` | Recomendado | `beta` ou `production` |
+
+---
+
+## Capítulo 9: Troubleshooting
+
+### Build falhou / Prisma error
+```bash
+# Forçar regeneração do Prisma Client no Railway
+railway run npx prisma generate
+railway run npx prisma migrate deploy
+```
+
+### "Relation does not exist" (tabela não existe)
+O banco não tem as migrations aplicadas. Executar:
+```bash
+railway run npx prisma migrate deploy
+```
+
+### Rollback de emergência
+**Opção 1 (Railway):** Dashboard → Deployments → encontrar o build anterior verde → Redeploy
+
+**Opção 2 (Git):**
+```bash
+git revert HEAD  # cria commit de reversão
+git push origin main  # auto-deploy do estado anterior
+```
+
+### Prisma Studio (visualizar banco em nuvem)
+```bash
+railway run npx prisma studio
+```
+
+### Verificar saúde da aplicação
+```
+GET /api/health
+→ { healthy: true, timestamp: "...", environment: "production" }
+```

@@ -38,6 +38,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/layout/EmptyState";
 import { Badge } from "@/components/ui/badge";
 import { StationIcon } from "@/components/station-icon";
+import { PageHeader } from "@/components/layout/PageHeader";
 
 const countItemSchema = z.object({
   prep_item_id: z.string().uuid(),
@@ -253,51 +254,32 @@ export default function HandoverPage() {
     );
   }
 
-  if (!selectedStation) {
-    return (
-      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-[90px]">
-        <h1 className="text-3xl font-bold tracking-tight mb-8">Escolha a Praça</h1>
-        {loadingStations ? (
-           <div className="grid grid-cols-2 gap-4">
-            <Skeleton className="h-32 rounded-xl" />
-            <Skeleton className="h-32 rounded-xl" />
-          </div>
-        ) : !stations || stations.length === 0 ? (
-           <EmptyState icon={LayoutDashboard} title="Nenhuma praça" description="Nenhuma praça configurada no sistema. Solicite ao gestor." />
-        ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            {stations.map((station: any) => (
-              <Card key={station.id} className="hover:border-primary transition-all cursor-pointer shadow-sm active:scale-95" onClick={() => setSelectedStation(station)}>
-                 <CardContent className="p-6 flex flex-col items-center justify-center gap-4 text-center aspect-square">
-                    <div className="bg-primary/10 p-4 rounded-full">
-                      <StationIcon iconName={station.icon} className="w-8 h-8 text-primary" />
-                    </div>
-                    <h2 className="text-xl font-bold">{station.name}</h2>
-                 </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
+  const getTitle = () => {
+    if (activeTab === "historico") return "Histórico de Contagens";
+    return selectedStation ? `Contagem: ${selectedStation.name}` : "Escolha a Praça";
+  };
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto pb-32">
+    <div className="p-4 md:p-8 max-w-5xl mx-auto pb-32">
       {serverTime && (
         <p className="text-sm text-muted-foreground mb-2">Horário do servidor: {serverTime}</p>
       )}
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold truncate">Contagem: {selectedStation.name}</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="h-12 px-4" onClick={() => setRequestOpen(true)}>
-            <Plus className="w-4 h-4 mr-1" /> Solicitar Insumo
-          </Button>
-          <Button variant="outline" onClick={() => setSelectedStation(null)} className="h-12 px-6">Trocar</Button>
-        </div>
-      </div>
+      
+      <PageHeader title={getTitle()}>
+        {selectedStation && activeTab === "contagem" && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="h-12 px-4" onClick={() => setRequestOpen(true)}>
+              <Plus className="w-4 h-4 mr-1" /> Solicitar Insumo
+            </Button>
+            <Button variant="outline" onClick={() => setSelectedStation(null)} className="h-12 px-6">Trocar</Button>
+          </div>
+        )}
+        {!selectedStation && (
+           <ChefHat className="w-8 h-8 text-muted-foreground/20" />
+        )}
+      </PageHeader>
 
-      {/* Tab Bar */}
+      {/* Tab Bar ALWAYS visible */}
       <div className="flex border-b border-border mb-6">
         {([
           { id: "contagem", label: "Contagem", icon: ClipboardList },
@@ -318,62 +300,109 @@ export default function HandoverPage() {
         ))}
       </div>
 
-      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Solicitar novo insumo</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Sua solicitação será enviada ao gerente para aprovação.
-            </p>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Nome do insumo</label>
-              <Input
-                className="h-12 text-lg"
-                placeholder="Ex: Molho Especial"
-                value={requestForm.name}
-                onChange={(e) => setRequestForm((v) => ({ ...v, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Unidade</label>
-              <Select value={requestForm.unit} onValueChange={(val) => setRequestForm((v) => ({ ...v, unit: val ?? "kg" }))}>
-                <SelectTrigger className="h-12 text-base">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="kg">Quilogramas (kg)</SelectItem>
-                  <SelectItem value="g">Gramas (g)</SelectItem>
-                  <SelectItem value="L">Litros (L)</SelectItem>
-                  <SelectItem value="ml">Mililitros (ml)</SelectItem>
-                  <SelectItem value="un">Unidades (un)</SelectItem>
-                  <SelectItem value="porc">Porções</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Observação (opcional)</label>
-              <Input
-                className="h-12 text-base"
-                placeholder="Por que este insumo é necessário?"
-                value={requestForm.note}
-                onChange={(e) => setRequestForm((v) => ({ ...v, note: e.target.value }))}
-              />
-            </div>
-            <Button
-              className="w-full h-12 text-lg"
-              disabled={!requestForm.name.trim() || requestMutation.isPending}
-              onClick={() => requestMutation.mutate()}
-            >
-              {requestMutation.isPending ? "Enviando..." : "Enviar Solicitação"}
-            </Button>
+      {activeTab === "historico" ? (
+        !selectedStation ? (
+          <div className="flex flex-col items-center justify-center text-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed border-muted-foreground/10">
+            <LayoutDashboard className="w-16 h-16 text-muted-foreground/20 mb-4" />
+            <h3 className="text-xl font-bold">Histórico por Praça</h3>
+            <p className="text-muted-foreground mb-6">Selecione uma praça para visualizar o histórico de contagens.</p>
+            <Button onClick={() => setActiveTab("contagem")}>Escolher Praça</Button>
           </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Tab: Contagem ─────────────────────────────────────────── */}
-      {activeTab === "contagem" && (
+        ) : (
+          <div className="space-y-6">
+            {loadingHistory ? (
+              <div className="space-y-4">
+                <Skeleton className="h-40 rounded-xl w-full" />
+                <Skeleton className="h-40 rounded-xl w-full" />
+              </div>
+            ) : !historyData?.groups?.length ? (
+              <EmptyState icon={History} title="Sem histórico" description="Nenhuma contagem registrada nos últimos 30 dias para esta praça." />
+            ) : (
+              historyData.groups.map((group) => (
+                <div key={group.date} className="space-y-3">
+                  <h2 className="text-lg font-bold text-muted-foreground">{group.date}</h2>
+                  {group.handovers.map((handover) => {
+                    const hasProduction = handover.items.some((item) => item.produced > 0);
+                    return (
+                    <Card key={handover.id} className="overflow-hidden">
+                      <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-muted-foreground">
+                            {handover.time} — {handover.user_name}
+                          </p>
+                        </div>
+                        {handover.note && (
+                          <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-lg px-3 py-2">
+                            {handover.note}
+                          </p>
+                        )}
+                        <div className="rounded-lg border overflow-hidden">
+                          <div className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
+                            <span>Insumo</span>
+                            <span className="text-right">Contagem</span>
+                            {hasProduction && <span className="text-right">Produzido</span>}
+                          </div>
+                          {handover.items.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-3 border-t items-start`}
+                            >
+                              <div>
+                                <span className="font-medium text-base">{item.name}</span>
+                                <span className="text-xs text-muted-foreground ml-1">({item.unit})</span>
+                                {item.production_logs?.map((pl, pIdx) => (
+                                  <p key={pIdx} className="text-xs text-muted-foreground mt-0.5">
+                                    {pl.user_name} · {pl.time}
+                                  </p>
+                                ))}
+                              </div>
+                              <span className="text-right font-semibold tabular-nums pt-0.5 text-base">
+                                {item.counted} {item.unit}
+                              </span>
+                              {hasProduction && (
+                                <span className={`text-right font-semibold tabular-nums pt-0.5 text-base ${
+                                  item.produced > 0 ? "text-green-600" : "text-muted-foreground"
+                                }`}>
+                                  {item.produced > 0 ? `${item.produced} ${item.unit}` : "—"}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    );
+                  })}
+                </div>
+              ))
+            )}
+          </div>
+        )
+      ) : !selectedStation ? (
+        <div className="space-y-6">
+          {loadingStations ? (
+             <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-32 rounded-xl" />
+              <Skeleton className="h-32 rounded-xl" />
+            </div>
+          ) : !stations || stations.length === 0 ? (
+             <EmptyState icon={LayoutDashboard} title="Nenhuma praça" description="Nenhuma praça configurada no sistema. Solicite ao gestor." />
+          ) : (
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {stations.map((station: any) => (
+                <Card key={station.id} className="hover:border-primary transition-all cursor-pointer shadow-sm active:scale-95 group" onClick={() => setSelectedStation(station)}>
+                   <CardContent className="p-6 flex flex-col items-center justify-center gap-4 text-center aspect-square">
+                      <div className="bg-primary/10 p-4 rounded-full group-hover:bg-primary/20 transition-colors">
+                        <StationIcon iconName={station.icon} className="w-8 h-8 text-primary" />
+                      </div>
+                      <h2 className="text-xl font-bold group-hover:text-primary transition-colors">{station.name}</h2>
+                   </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
         <>
           {loadingItems ? (
             <div className="space-y-4">
@@ -441,77 +470,60 @@ export default function HandoverPage() {
         </>
       )}
 
-      {/* ── Tab: Histórico ─────────────────────────────────────────── */}
-      {activeTab === "historico" && (
-        <div className="space-y-6">
-          {loadingHistory ? (
-            <div className="space-y-4">
-              <Skeleton className="h-40 rounded-xl w-full" />
-              <Skeleton className="h-40 rounded-xl w-full" />
+      {/* Dialogs */}
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Solicitar novo insumo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Sua solicitação será enviada ao gerente para aprovação.
+            </p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Nome do insumo</label>
+              <Input
+                className="h-12 text-lg"
+                placeholder="Ex: Molho Especial"
+                value={requestForm.name}
+                onChange={(e) => setRequestForm((v) => ({ ...v, name: e.target.value }))}
+              />
             </div>
-          ) : !historyData?.groups?.length ? (
-            <EmptyState icon={History} title="Sem histórico" description="Nenhuma contagem registrada nos últimos 30 dias para esta praça." />
-          ) : (
-            historyData.groups.map((group) => (
-              <div key={group.date} className="space-y-3">
-                <h2 className="text-lg font-bold text-muted-foreground">{group.date}</h2>
-                {group.handovers.map((handover) => {
-                  const hasProduction = handover.items.some((item) => item.produced > 0);
-                  return (
-                  <Card key={handover.id} className="overflow-hidden">
-                    <CardContent className="p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          {handover.time} — {handover.user_name}
-                        </p>
-                      </div>
-                      {handover.note && (
-                        <p className="text-sm text-muted-foreground italic bg-muted/50 rounded-lg px-3 py-2">
-                          {handover.note}
-                        </p>
-                      )}
-                      <div className="rounded-lg border overflow-hidden">
-                        <div className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-2 bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wide`}>
-                          <span>Insumo</span>
-                          <span className="text-right">Contagem</span>
-                          {hasProduction && <span className="text-right">Produzido</span>}
-                        </div>
-                        {handover.items.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className={`grid ${hasProduction ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]"} gap-x-4 px-4 py-3 border-t items-start`}
-                          >
-                            <div>
-                              <span className="font-medium">{item.name}</span>
-                              <span className="text-xs text-muted-foreground ml-1">({item.unit})</span>
-                              {item.production_logs?.map((pl, pIdx) => (
-                                <p key={pIdx} className="text-xs text-muted-foreground mt-0.5">
-                                  {pl.user_name} · {pl.time}
-                                </p>
-                              ))}
-                            </div>
-                            <span className="text-right font-semibold tabular-nums pt-0.5">
-                              {item.counted} {item.unit}
-                            </span>
-                            {hasProduction && (
-                              <span className={`text-right font-semibold tabular-nums pt-0.5 ${
-                                item.produced > 0 ? "text-green-600" : "text-muted-foreground"
-                              }`}>
-                                {item.produced > 0 ? `${item.produced} ${item.unit}` : "—"}
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Unidade</label>
+              <Select value={requestForm.unit} onValueChange={(val) => setRequestForm((v) => ({ ...v, unit: val ?? "kg" }))}>
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="kg">Quilogramas (kg)</SelectItem>
+                  <SelectItem value="g">Gramas (g)</SelectItem>
+                  <SelectItem value="L">Litros (L)</SelectItem>
+                  <SelectItem value="ml">Mililitros (ml)</SelectItem>
+                  <SelectItem value="un">Unidades (un)</SelectItem>
+                  <SelectItem value="porc">Porções</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Observação (opcional)</label>
+              <Input
+                className="h-12 text-base"
+                placeholder="Por que este insumo é necessário?"
+                value={requestForm.note}
+                onChange={(e) => setRequestForm((v) => ({ ...v, note: e.target.value }))}
+              />
+            </div>
+            <Button
+              className="w-full h-12 text-lg"
+              disabled={!requestForm.name.trim() || requestMutation.isPending}
+              onClick={() => requestMutation.mutate()}
+            >
+              {requestMutation.isPending ? "Enviando..." : "Enviar Solicitação"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {reviewState && (
         <Dialog open onOpenChange={(v) => !v && setReviewState(null)}>

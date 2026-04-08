@@ -16,7 +16,7 @@ async function listRecipesHandler(req: AppRequest) {
   const recipes = await prisma.recipe.findMany({
     where: {
       tenant_id,
-      allowed_roles: { has: role },
+      allowed_roles: { has: role as any },
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: {

@@ -17,7 +17,7 @@ async function getTargetUser(id: string, tenant_id: string) {
 const updateUserSchema = z
   .object({
     name: z.string().min(2).optional(),
-    role: z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"]).optional(),
+    profile_id: z.string().uuid().optional(),
     password: z.string().min(8).optional(),
     suspended: z.boolean().optional(),
   })
@@ -26,7 +26,7 @@ const updateUserSchema = z
 async function updateUserHandler(req: AppRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   const tenant_id = req.ctx.tenant_id!;
-  const { name, role, password, suspended } = req.ctx.parsedBody;
+  const { name, profile_id, password, suspended } = req.ctx.parsedBody;
 
   const target = await getTargetUser(id, tenant_id);
   if (!target) {
@@ -67,16 +67,28 @@ async function updateUserHandler(req: AppRequest, { params }: { params: { id: st
     }
   }
 
+  // Resolve profile to get base_role
+  let profileData: Record<string, unknown> = {};
+  if (profile_id !== undefined) {
+    const profile = await prisma.userProfile.findFirst({
+      where: { id: profile_id, tenant_id },
+    });
+    if (!profile) {
+      return NextResponse.json({ error: "Perfil não encontrado", code: "NOT_FOUND" }, { status: 404 });
+    }
+    profileData = { profile_id, role: profile.base_role };
+  }
+
   const updated = await prisma.user.update({
     where: { id },
     data: {
       ...(name !== undefined ? { name } : {}),
-      ...(role !== undefined ? { role } : {}),
+      ...profileData,
       ...(suspended !== undefined ? { status: suspended ? "INACTIVE" : "ACTIVE" } : {}),
     },
   });
 
-  req.logger.info({ user_id: id, name, role, suspended }, "User updated");
+  req.logger.info({ user_id: id, name, profile_id, suspended }, "User updated");
   return NextResponse.json(updated);
 }
 
