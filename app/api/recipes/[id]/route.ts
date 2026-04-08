@@ -35,7 +35,8 @@ async function getRecipeHandler(req: AppRequest, { params }: { params: { id: str
     return NextResponse.json({ error: "Ficha técnica não encontrada" }, { status: 404 });
   }
 
-  if (!recipe.allowed_roles.includes(role as any)) {
+  const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
+  if (!isAdminOrManager && !recipe.allowed_roles.includes(role as any)) {
     return NextResponse.json({ error: "Sem permissão para acessar esta ficha" }, { status: 403 });
   }
 

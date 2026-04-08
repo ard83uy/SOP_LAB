@@ -24,7 +24,7 @@ const MODULE_LINKS: Record<string, { href: string; adminHref?: string; label: st
   handover:   { href: "/staff/handover",   label: "Contagem",   icon: ClipboardList },
   production: { href: "/staff/production", label: "Produção",   icon: ChefHat },
   prep_items: { href: "/admin/prep-items", label: "Insumos",    icon: Package },
-  fichas:     { href: "/staff/fichas",     label: "Fichas",     icon: BookOpen },
+  fichas:     { href: "/staff/fichas",     adminHref: "/admin/fichas-tecnicas", label: "Fichas",     icon: BookOpen },
   checklists: { href: "/staff/checklists", adminHref: "/admin/checklists", label: "Checklists", icon: CheckSquare },
   settings:   { href: "/admin/settings",   label: "Config",     icon: Settings },
 };

@@ -13,10 +13,12 @@ async function listRecipesHandler(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
   const role = req.ctx.role!;
 
+  const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
+
   const recipes = await prisma.recipe.findMany({
     where: {
       tenant_id,
-      allowed_roles: { has: role as any },
+      ...(isAdminOrManager ? {} : { allowed_roles: { has: role as any } }),
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: {
