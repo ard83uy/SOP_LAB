@@ -36,10 +36,15 @@ type Recipe = {
   base_yield: number;
   yield_unit: string;
   photo_url: string | null;
-  allowed_roles: string[];
+  allowed_profile_ids: string[];
   ingredients: any[];
   steps: any[];
   _count: { comments: number };
+};
+
+type UserProfile = {
+  id: string;
+  name: string;
 };
 
 const CATEGORIES: { id: RecipeCategory | "ALL"; label: string; icon: any }[] = [
@@ -73,14 +78,6 @@ const UNITS = [
   { value: "porções", label: "porções" },
 ];
 
-const ALL_ROLES = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "MANAGER", label: "Gerente" },
-  { value: "STATION_LEADER", label: "Líder de Praça" },
-  { value: "PREP_KITCHEN", label: "Cozinha de Produção" },
-  { value: "STAFF", label: "Funcionário" },
-];
-
 // ── Create Dialog ────────────────────────────────────────────────────────────
 
 function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -92,7 +89,17 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
     category: "PRIMARY" as RecipeCategory,
     base_yield: "",
     yield_unit: "porções",
-    allowed_roles: ["ADMIN", "MANAGER"] as string[],
+    allowed_profile_ids: [] as string[],
+  });
+
+  const { data: profiles = [] } = useQuery<UserProfile[]>({
+    queryKey: ["user-profiles"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-profiles");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: open,
   });
 
   useEffect(() => {
@@ -100,7 +107,7 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
       setForm({
         name: "", description: "", category: "PRIMARY",
         base_yield: "", yield_unit: "porções",
-        allowed_roles: ["ADMIN", "MANAGER"],
+        allowed_profile_ids: [],
       });
     }
   }, [open]);
@@ -120,7 +127,7 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
           category: form.category,
           base_yield: yieldNum,
           yield_unit: form.yield_unit,
-          allowed_roles: form.allowed_roles,
+          allowed_profile_ids: form.allowed_profile_ids,
         }),
       });
       if (!res.ok) throw new Error((await res.json()).error || "Erro ao criar");
@@ -135,12 +142,12 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const toggleRole = (role: string) => {
+  const toggleProfile = (profileId: string) => {
     setForm((f) => ({
       ...f,
-      allowed_roles: f.allowed_roles.includes(role)
-        ? f.allowed_roles.filter((r) => r !== role)
-        : [...f.allowed_roles, role],
+      allowed_profile_ids: f.allowed_profile_ids.includes(profileId)
+        ? f.allowed_profile_ids.filter((id) => id !== profileId)
+        : [...f.allowed_profile_ids, profileId],
     }));
   };
 
@@ -211,22 +218,26 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
 
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Quem pode visualizar</label>
-            <div className="flex flex-wrap gap-2">
-              {ALL_ROLES.map((role) => (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => toggleRole(role.value)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    form.allowed_roles.includes(role.value)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "border-border text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {role.label}
-                </button>
-              ))}
-            </div>
+            {profiles.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum perfil cadastrado ainda.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {profiles.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => toggleProfile(profile.id)}
+                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                      form.allowed_profile_ids.includes(profile.id)
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {profile.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -234,7 +245,7 @@ function CreateRecipeDialog({ open, onClose }: { open: boolean; onClose: () => v
           <Button variant="outline" onClick={onClose}>Cancelar</Button>
           <Button
             onClick={() => mutation.mutate()}
-            disabled={mutation.isPending || !form.name.trim() || !form.base_yield || form.allowed_roles.length === 0}
+            disabled={mutation.isPending || !form.name.trim() || !form.base_yield}
           >
             {mutation.isPending ? "Criando..." : "Criar e Editar Receita"}
           </Button>

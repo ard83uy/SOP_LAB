@@ -50,10 +50,8 @@ Este documento descreve a infraestrutura, fluxo GitOps e operações de manuten�
    ```
 5. **Seed de dados de teste:**
    ```bash
-   railway run npx prisma db seed
+   railway run npx tsx scripts/seed-profiles.ts <tenant_id>
    ```
-   O seed cria o tenant "La Barbara" com perfis padrão (Admin, Gerente, Líder de Praça, Cozinheiro de Produção, Funcionário).
-
 6. **Verificar:** `GET /api/health` deve retornar `{ healthy: true, environment: "beta" }`
 
 ---
@@ -73,7 +71,7 @@ Este documento descreve a infraestrutura, fluxo GitOps e operações de manuten�
    railway link  # aponta para o projeto prod
    railway run npx prisma migrate deploy
    ```
-   ⚠️ **NUNCA rodar seed em produção.** Clientes criam seus próprios dados.
+   ⚠️ **NUNCA rodar seed em produção.**
 
 ---
 
@@ -100,12 +98,16 @@ git checkout -b feature/minha-feature
 # 2. Desenvolver localmente
 npm run dev  # conecta no banco de dev (Railway Dev)
 
-# 3. Quando tiver migrations novas
-npx prisma migrate dev --name descricao_da_mudanca
+# 3. Quando tiver migrations novas — NÃO usar migrate dev em modo não-interativo
+#    Em vez disso, criar o arquivo SQL manualmente:
+mkdir -p prisma/migrations/YYYYMMDDHHMMSS_nome_da_migration
+# Escrever o SQL em prisma/migrations/.../migration.sql
+# Aplicar com:
+npx prisma migrate deploy
+npx prisma generate
 
 # 4. Abrir PR → beta
 git push origin feature/minha-feature
-# No GitHub: PR feature/* → beta
 
 # 5. Merge em beta → deploy automático Railway Beta
 # Testar na URL de staging
@@ -114,11 +116,17 @@ git push origin feature/minha-feature
 # Merge → deploy automático Railway Prod
 ```
 
+> **Nota:** `prisma migrate dev` requer TTY interativo. Em ambientes não-interativos (CI, Railway run), use sempre `prisma migrate deploy` com arquivos SQL pré-criados.
+
 ---
 
 ## Capítulo 6: Migrations em Produção
 
-Toda nova migration é aplicada automaticamente no deploy via o `postinstall` / build do Railway.
+Toda nova migration é aplicada automaticamente no deploy pelo Railway via:
+```json
+// railway.json
+{ "deploy": { "startCommand": "npx prisma migrate deploy && node server.js" } }
+```
 
 Para migrations manuais de emergência:
 ```bash
@@ -126,21 +134,27 @@ railway link  # selecionar projeto prod
 railway run npx prisma migrate deploy
 ```
 
-### Migrações aplicadas até hoje
+### Histórico de migrações aplicadas
+
 | Data | Migration | Descrição |
 |------|-----------|-----------|
-| 2026-04-07 | `initial_setup` | Schema completo MVP |
-| 2026-04-08 | `add_user_profiles` | Modelo UserProfile + profile_id no User |
-| 2026-04-08 | `add_base_role_to_profiles` | Campo base_role no UserProfile |
-| 2026-04-08 | `add_allowed_modules_to_profiles` | Campo allowed_modules no UserProfile |
+| 2026-04-05 | `20260405183933_init` | Schema completo MVP |
+| 2026-04-05 | `20260405210000_day_targets_requests` | PrepItemDayTarget e PrepItemRequest |
+| 2026-04-07 | `20260407002318_sync_schema` | Sincronização do schema |
+| 2026-04-07 | `20260407022308_add_note_to_shift_handover` | Campo note no ShiftHandover |
+| 2026-04-07 | `20260407123305_add_station_icon` | Campo icon na Station |
+| 2026-04-08 | `20260408044601_add_recipe_models` | Recipe, RecipeIngredient, RecipeStep, RecipeComment |
+| 2026-04-08 | `20260408141227_add_user_profiles` | Modelo UserProfile + profile_id no User |
+| 2026-04-08 | `20260408143451_add_base_role_to_profiles` | Campo base_role no UserProfile |
+| 2026-04-08 | `20260408145844_add_allowed_modules_to_profiles` | Campo allowed_modules no UserProfile |
+| 2026-04-08 | `20260408155707_add_checklists_module` | Checklist, ChecklistTask, ChecklistCompletion |
+| 2026-04-08 | `20260408200000_replace_allowed_roles_with_profile_ids` | Recipe: `allowed_roles` → `allowed_profile_ids String[]` |
 
 ---
 
 ## Capítulo 7: Seed de Perfis Padrão
 
-Ao criar um novo tenant, o gerente deve criar os perfis relevantes em Configurações → Perfis.
-
-Para ambientes de teste, o script abaixo cria os perfis padrão para um tenant existente:
+Para ambientes de teste, criar perfis padrão para um tenant existente:
 
 ```bash
 npx tsx scripts/seed-profiles.ts <tenant_id>
@@ -174,13 +188,11 @@ Perfis padrão e seus módulos:
 
 ### Build falhou / Prisma error
 ```bash
-# Forçar regeneração do Prisma Client no Railway
 railway run npx prisma generate
 railway run npx prisma migrate deploy
 ```
 
-### "Relation does not exist" (tabela não existe)
-O banco não tem as migrations aplicadas. Executar:
+### "Relation does not exist"
 ```bash
 railway run npx prisma migrate deploy
 ```
@@ -190,16 +202,16 @@ railway run npx prisma migrate deploy
 
 **Opção 2 (Git):**
 ```bash
-git revert HEAD  # cria commit de reversão
-git push origin main  # auto-deploy do estado anterior
+git revert HEAD
+git push origin main
 ```
 
-### Prisma Studio (visualizar banco em nuvem)
+### Prisma Studio
 ```bash
 railway run npx prisma studio
 ```
 
-### Verificar saúde da aplicação
+### Verificar saúde
 ```
 GET /api/health
 → { healthy: true, timestamp: "...", environment: "production" }

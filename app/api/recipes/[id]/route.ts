@@ -12,6 +12,7 @@ import { updateRecipeSchema } from "@/lib/validations/schemas";
 async function getRecipeHandler(req: AppRequest, { params }: { params: { id: string } }) {
   const tenant_id = req.ctx.tenant_id!;
   const role = req.ctx.role!;
+  const profile_id = req.ctx.profile_id;
 
   const recipe = await prisma.recipe.findUnique({
     where: { id: params.id, tenant_id },
@@ -36,7 +37,7 @@ async function getRecipeHandler(req: AppRequest, { params }: { params: { id: str
   }
 
   const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
-  if (!isAdminOrManager && !recipe.allowed_roles.includes(role as any)) {
+  if (!isAdminOrManager && profile_id && !recipe.allowed_profile_ids.includes(profile_id)) {
     return NextResponse.json({ error: "Sem permissão para acessar esta ficha" }, { status: 403 });
   }
 
@@ -94,7 +95,7 @@ async function updateRecipeHandler(req: AppRequest, { params }: { params: { id: 
     if (data.base_yield !== undefined) updateData.base_yield = data.base_yield;
     if (data.yield_unit !== undefined) updateData.yield_unit = data.yield_unit;
     if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
-    if (data.allowed_roles !== undefined) updateData.allowed_roles = data.allowed_roles;
+    if (data.allowed_profile_ids !== undefined) updateData.allowed_profile_ids = data.allowed_profile_ids;
 
     return tx.recipe.update({
       where: { id: params.id },

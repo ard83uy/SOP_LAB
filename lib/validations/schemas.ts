@@ -72,7 +72,7 @@ export const createRecipeSchema = z.object({
   base_yield: z.number().positive().max(99999),
   yield_unit: z.string().min(1).max(20),
   photo_url: z.string().max(2048).optional(),
-  allowed_roles: z.array(z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"])).min(1),
+  allowed_profile_ids: z.array(z.string().uuid()).default([]),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),
@@ -93,7 +93,7 @@ export const updateRecipeSchema = z.object({
   base_yield: z.number().positive().max(99999).optional(),
   yield_unit: z.string().min(1).max(20).optional(),
   photo_url: z.string().max(2048).nullable().optional(),
-  allowed_roles: z.array(z.enum(["ADMIN", "MANAGER", "STATION_LEADER", "PREP_KITCHEN", "STAFF"])).min(1).optional(),
+  allowed_profile_ids: z.array(z.string().uuid()).optional(),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),

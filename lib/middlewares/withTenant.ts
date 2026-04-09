@@ -11,7 +11,7 @@ export const withTenant: Middleware = async (req, next) => {
 
   const user = await prisma.user.findUnique({
     where: { clerk_user_id },
-    select: { id: true, tenant_id: true, role: true }
+    select: { id: true, tenant_id: true, role: true, profile_id: true }
   });
 
   if (!user) {
@@ -25,6 +25,7 @@ export const withTenant: Middleware = async (req, next) => {
   req.ctx.tenant_id = user.tenant_id;
   req.ctx.user_id = user.id;
   req.ctx.role = user.role;
+  req.ctx.profile_id = user.profile_id;
 
   req.logger = req.logger.child({ tenant_id: user.tenant_id, user_id: user.id });
 

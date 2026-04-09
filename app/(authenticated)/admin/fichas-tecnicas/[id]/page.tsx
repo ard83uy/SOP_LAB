@@ -59,10 +59,15 @@ type Recipe = {
   base_yield: number;
   yield_unit: string;
   photo_url: string | null;
-  allowed_roles: string[];
+  allowed_profile_ids: string[];
   ingredients: Ingredient[];
   steps: Step[];
   comments: Comment[];
+};
+
+type UserProfile = {
+  id: string;
+  name: string;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -81,13 +86,6 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const UNITS = ["kg", "g", "L", "ml", "un", "porções", "colher(es)", "xícara(s)", "pitada(s)"];
 
-const ALL_ROLES = [
-  { value: "ADMIN", label: "Admin" },
-  { value: "MANAGER", label: "Gerente" },
-  { value: "STATION_LEADER", label: "Líder de Praça" },
-  { value: "PREP_KITCHEN", label: "Cozinha" },
-  { value: "STAFF", label: "Funcionário" },
-];
 
 // ── Ingredient source picker ─────────────────────────────────────────────────
 
@@ -218,7 +216,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [photoUrl, setPhotoUrl] = useState("");
-  const [allowedRoles, setAllowedRoles] = useState<string[]>([]);
+  const [allowedProfileIds, setAllowedProfileIds] = useState<string[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [customYield, setCustomYield] = useState<string>("");
@@ -239,7 +237,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     setIngredients(recipe.ingredients);
     setSteps(recipe.steps);
     setPhotoUrl(recipe.photo_url ?? "");
-    setAllowedRoles(recipe.allowed_roles);
+    setAllowedProfileIds(recipe.allowed_profile_ids);
     setCustomYield(String(recipe.base_yield));
     setInitialized(true);
   }
@@ -259,7 +257,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           photo_url: photoUrl.trim() || null,
-          allowed_roles: allowedRoles,
+          allowed_profile_ids: allowedProfileIds,
           ingredients: ingredients.map((ing, idx) => ({
             prep_item_id: ing.prep_item_id || undefined,
             source_recipe_id: ing.source_recipe_id || undefined,
@@ -344,12 +342,21 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     setDirty(true);
   };
 
-  const toggleRole = (role: string) => {
-    setAllowedRoles((r) =>
-      r.includes(role) ? r.filter((v) => v !== role) : [...r, role]
+  const toggleProfile = (profileId: string) => {
+    setAllowedProfileIds((ids) =>
+      ids.includes(profileId) ? ids.filter((v) => v !== profileId) : [...ids, profileId]
     );
     setDirty(true);
   };
+
+  const { data: profiles = [] } = useQuery<UserProfile[]>({
+    queryKey: ["user-profiles"],
+    queryFn: async () => {
+      const res = await fetch("/api/user-profiles");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   if (isLoading) {
     return (
@@ -586,23 +593,27 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
 
       {/* ── Access control ──────────────────────────────────────────────────── */}
       <section className="space-y-3">
-        <h2 className="text-lg font-bold">Permissões de Acesso</h2>
-        <div className="flex flex-wrap gap-2">
-          {ALL_ROLES.map((role) => (
-            <button
-              key={role.value}
-              type="button"
-              onClick={() => toggleRole(role.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                allowedRoles.includes(role.value)
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "border-border text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {role.label}
-            </button>
-          ))}
-        </div>
+        <h2 className="text-lg font-bold">Perfis com Acesso</h2>
+        {profiles.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum perfil cadastrado ainda.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {profiles.map((profile) => (
+              <button
+                key={profile.id}
+                type="button"
+                onClick={() => toggleProfile(profile.id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                  allowedProfileIds.includes(profile.id)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {profile.name}
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       {/* ── Comments ────────────────────────────────────────────────────────── */}

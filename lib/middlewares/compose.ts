@@ -6,6 +6,7 @@ export type AppContext = {
   tenant_id?: string;
   user_id?: string;
   role?: string;
+  profile_id?: string | null;
   parsedBody?: any;
 };
 

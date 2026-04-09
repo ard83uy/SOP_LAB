@@ -221,7 +221,7 @@ model Recipe {
   base_yield      Float               // Ex: 10 (porções), 2 (kg)
   yield_unit      String              // Ex: "porções", "kg"
   photo_url       String?
-  allowed_roles   UserRole[]
+  allowed_profile_ids String[]  @default([])
   created_at      DateTime            @default(now())
   updated_at      DateTime            @updatedAt
 

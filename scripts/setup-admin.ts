@@ -4,7 +4,7 @@ const prisma = new PrismaClient()
 
 async function main() {
   // Configurações (Ajuste se precisar)
-  const CLERK_USER_ID = "user_3Bx5U0mHl2LPO18UantsgyXiW3D"
+  const CLERK_USER_ID = process.env.CLERK_USER_ID ?? "user_3C6JRrjk7C8UJUxSfkH5H7OeYH2"
   const USER_EMAIL = "alvaro@labarbara.com.br"
   const USER_NAME = "Alvaro Delacoste"
 
@@ -24,7 +24,7 @@ async function main() {
     })
     const TENANT_ID = tenant.id
     console.log(`   Tenant ID: ${TENANT_ID}`)
-    
+
     console.log("👤 Verificando Usuário...")
     const user = await prisma.user.upsert({
       where: { clerk_user_id: CLERK_USER_ID },

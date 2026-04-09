@@ -12,13 +12,16 @@ import { prisma } from "@/lib/prisma";
 async function listRecipesHandler(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
   const role = req.ctx.role!;
+  const profile_id = req.ctx.profile_id;
 
   const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
 
   const recipes = await prisma.recipe.findMany({
     where: {
       tenant_id,
-      ...(isAdminOrManager ? {} : { allowed_roles: { has: role as any } }),
+      ...(!isAdminOrManager && profile_id
+        ? { allowed_profile_ids: { has: profile_id } }
+        : {}),
     },
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: {
@@ -41,7 +44,7 @@ async function listRecipesHandler(req: AppRequest) {
 
 async function createRecipeHandler(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
-  const { name, description, category, base_yield, yield_unit, photo_url, allowed_roles, ingredients, steps } = req.ctx.parsedBody;
+  const { name, description, category, base_yield, yield_unit, photo_url, allowed_profile_ids, ingredients, steps } = req.ctx.parsedBody;
 
   const existing = await prisma.recipe.findUnique({
     where: { tenant_id_name: { tenant_id, name } },
@@ -63,7 +66,7 @@ async function createRecipeHandler(req: AppRequest) {
       base_yield,
       yield_unit,
       photo_url: photo_url ?? null,
-      allowed_roles,
+      allowed_profile_ids: allowed_profile_ids ?? [],
       ingredients: ingredients?.length
         ? { create: ingredients.map((ing: any, idx: number) => ({
             prep_item_id: ing.prep_item_id ?? null,
