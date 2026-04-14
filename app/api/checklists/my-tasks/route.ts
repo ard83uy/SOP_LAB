@@ -50,7 +50,14 @@ async function myTasksHandler(req: AppRequest) {
         return false;
       })
       .map((task) => ({
-        ...task,
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        frequency: task.frequency,
+        days_of_week: task.days_of_week,
+        time_slot: task.time_slot,
+        sort_order: task.sort_order,
+        points: task.points,
         checklist_id: cl.id,
         checklist_name: cl.name,
       })),

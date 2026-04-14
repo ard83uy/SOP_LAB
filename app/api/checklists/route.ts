@@ -18,6 +18,11 @@ async function listChecklistsHandler(req: AppRequest) {
     orderBy: { created_at: "desc" },
     include: {
       profiles: { select: { id: true, name: true } },
+      tasks: {
+        where: { is_active: true },
+        select: { id: true, title: true, description: true, time_slot: true },
+        orderBy: { sort_order: "asc" },
+      },
       _count: { select: { tasks: true } },
       creator: { select: { name: true } },
     },

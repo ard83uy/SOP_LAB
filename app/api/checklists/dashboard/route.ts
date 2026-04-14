@@ -65,7 +65,7 @@ async function dashboardHandler(req: AppRequest) {
       user_name: string;
       completed: number;
       total: number;
-      tasks: { task_id: string; title: string; time_slot: string; completed: boolean; completed_at: Date | null }[];
+      tasks: { task_id: string; title: string; description: string | null; time_slot: string; completed: boolean; completed_at: Date | null }[];
     }[];
   }>();
 
@@ -102,6 +102,7 @@ async function dashboardHandler(req: AppRequest) {
           userEntry.tasks.push({
             task_id: task.id,
             title: task.title,
+            description: task.description ?? null,
             time_slot: task.time_slot,
             completed: isCompleted,
             completed_at: completionTimeMap.get(key) ?? null,

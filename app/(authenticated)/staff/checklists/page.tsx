@@ -13,8 +13,9 @@ import {
   Sun,
   Sunset,
   Clock,
+  CalendarDays,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +29,10 @@ type Task = {
   id: string;
   title: string;
   description: string | null;
+  frequency: "DAILY" | "SPECIFIC_DAYS";
+  days_of_week: number[];
   time_slot: string;
+  sort_order: number;
   points: number;
   checklist_name: string;
   completed: boolean;
@@ -153,43 +157,114 @@ export default function StaffChecklistsPage() {
   const completedTasks = tasks.filter((t) => t.completed).length;
   const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-  // Group tasks by time_slot
+  // Milestone toasts
+  const prevPercentRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (totalTasks === 0) return;
+    if (prevPercentRef.current === null) {
+      prevPercentRef.current = progressPercent;
+      return;
+    }
+    const prev = prevPercentRef.current;
+    if (prev < 50 && progressPercent >= 50 && progressPercent < 100) {
+      toast.success("Metade do caminho! 🔥", { duration: 3000 });
+    } else if (prev < 100 && progressPercent >= 100) {
+      toast.success("Dia completo! Arrasou! 🎉", { duration: 4000 });
+    }
+    prevPercentRef.current = progressPercent;
+  }, [progressPercent, totalTasks]);
+
+  const barColorClass =
+    progressPercent >= 100
+      ? "bg-emerald-500"
+      : progressPercent >= 80
+        ? "bg-emerald-400"
+        : progressPercent >= 50
+          ? "bg-amber-400"
+          : "bg-primary";
+
+  const percentColorClass =
+    progressPercent >= 80
+      ? "text-emerald-500"
+      : progressPercent >= 50
+        ? "text-amber-500"
+        : "text-muted-foreground";
+
+  // Specific-days tasks always go to the top
+  const specificTasks = tasks.filter((t) => t.frequency === "SPECIFIC_DAYS");
+  const dailyTasks = tasks.filter((t) => t.frequency !== "SPECIFIC_DAYS");
+
+  // Group daily tasks by time_slot
   const grouped = Object.entries(TIME_SLOT_CONFIG)
     .map(([slot, config]) => ({
       slot,
       ...config,
-      tasks: tasks.filter((t) => t.time_slot === slot),
+      tasks: dailyTasks.filter((t) => t.time_slot === slot),
     }))
     .filter((g) => g.tasks.length > 0)
     .sort((a, b) => a.order - b.order);
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6 pb-24">
-      <PageHeader title="Meu Dia" subtitle="Checklists de hoje" />
+    <div className="max-w-2xl mx-auto pb-24">
+      {/* Keyframes for animations */}
+      <style>{`
+        @keyframes progress-shimmer {
+          0% { background-position: 200% center; }
+          100% { background-position: -200% center; }
+        }
+        @keyframes progress-glow {
+          0%, 100% { box-shadow: 0 0 6px 0px rgba(16,185,129,0.4); }
+          50% { box-shadow: 0 0 16px 3px rgba(16,185,129,0.7); }
+        }
+        @keyframes bar-pop {
+          0% { transform: scaleY(1); }
+          40% { transform: scaleY(1.35); }
+          70% { transform: scaleY(0.9); }
+          100% { transform: scaleY(1); }
+        }
+      `}</style>
 
-      {/* Progress header */}
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-primary" />
-              <span className="font-bold text-lg">
-                {completedTasks}/{totalTasks}
-              </span>
-              <span className="text-sm text-muted-foreground">tarefas</span>
-            </div>
-            <Badge variant={completedTasks === totalTasks && totalTasks > 0 ? "default" : "secondary"}>
+      {/* Sticky progress bar */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b px-4 md:px-8 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <CheckSquare className="w-4 h-4 text-primary" />
+            <span className="font-bold text-sm tabular-nums">
+              {completedTasks}/{totalTasks}
+            </span>
+          </div>
+          <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
+            <div
+              className={`h-3 rounded-full transition-[width] duration-700 ease-out transition-[background-color] duration-500 ${barColorClass}`}
+              style={
+                progressPercent >= 100
+                  ? {
+                      width: "100%",
+                      background:
+                        "linear-gradient(90deg, #10b981 0%, #34d399 40%, #6ee7b7 60%, #10b981 100%)",
+                      backgroundSize: "200% 100%",
+                      animation: "progress-shimmer 2s linear infinite, progress-glow 2s ease-in-out infinite",
+                    }
+                  : { width: `${progressPercent}%` }
+              }
+            />
+          </div>
+          <span className={`text-xs font-bold tabular-nums w-8 text-right shrink-0 transition-colors duration-500 ${percentColorClass}`}>
+            {Math.round(progressPercent)}%
+          </span>
+        </div>
+        {/* Pts badge só aparece quando há tarefas */}
+        {totalTasks > 0 && (
+          <div className="flex justify-end mt-1">
+            <Badge variant={completedTasks === totalTasks ? "default" : "secondary"} className="text-[10px]">
               {data?.earnedPoints ?? 0} / {data?.totalPoints ?? 0} pts
             </Badge>
           </div>
-          <div className="w-full bg-muted rounded-full h-2.5">
-            <div
-              className="bg-primary h-2.5 rounded-full transition-all duration-500"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+        )}
+      </div>
+
+      <div className="p-4 md:p-8 space-y-6">
+        <PageHeader title="Meu Dia" subtitle="Checklists de hoje" />
 
       {/* Tasks by time slot */}
       {totalTasks === 0 ? (
@@ -199,34 +274,60 @@ export default function StaffChecklistsPage() {
           <p className="text-sm mt-1">Aproveite o dia!</p>
         </div>
       ) : (
-        grouped.map((group) => {
-          const Icon = group.icon;
-          return (
-            <div key={group.slot} className="space-y-2">
+        <>
+          {/* Specific-day tasks pinned at the top */}
+          {specificTasks.length > 0 && (
+            <div className="space-y-2">
               <div className="flex items-center gap-2 px-1">
-                <Icon className="w-4 h-4 text-muted-foreground" />
-                <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-                  {group.label}
+                <CalendarDays className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-bold text-amber-500 uppercase tracking-wide">
+                  Só Hoje
                 </h2>
                 <span className="text-xs text-muted-foreground">
-                  ({group.tasks.filter((t) => t.completed).length}/{group.tasks.length})
+                  ({specificTasks.filter((t) => t.completed).length}/{specificTasks.length})
                 </span>
               </div>
               <div className="space-y-1.5">
-                {group.tasks.map((task) => (
+                {specificTasks.map((task) => (
                   <TaskRow
                     key={task.id}
                     task={task}
                     onToggle={() => toggleTask(task)}
-                    isLoading={
-                      completeMutation.isPending || uncompleteMutation.isPending
-                    }
+                    isLoading={completeMutation.isPending || uncompleteMutation.isPending}
                   />
                 ))}
               </div>
             </div>
-          );
-        })
+          )}
+
+          {/* Daily tasks grouped by time slot */}
+          {grouped.map((group) => {
+            const Icon = group.icon;
+            return (
+              <div key={group.slot} className="space-y-2">
+                <div className="flex items-center gap-2 px-1">
+                  <Icon className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
+                    {group.label}
+                  </h2>
+                  <span className="text-xs text-muted-foreground">
+                    ({group.tasks.filter((t) => t.completed).length}/{group.tasks.length})
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  {group.tasks.map((task) => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      onToggle={() => toggleTask(task)}
+                      isLoading={completeMutation.isPending || uncompleteMutation.isPending}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </>
       )}
 
       {/* Weekly Ranking */}
@@ -293,6 +394,7 @@ export default function StaffChecklistsPage() {
           </Card>
         </div>
       )}
+      </div>
     </div>
   );
 }

@@ -9,6 +9,8 @@ import {
   BarChart3,
   ToggleLeft,
   ToggleRight,
+  Search,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -44,6 +46,13 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 type Profile = { id: string; name: string };
 
+type ChecklistTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  time_slot: string;
+};
+
 type Checklist = {
   id: string;
   name: string;
@@ -51,6 +60,7 @@ type Checklist = {
   is_active: boolean;
   created_at: string;
   profiles: Profile[];
+  tasks: ChecklistTask[];
   _count: { tasks: number };
   creator: { name: string };
 };
@@ -71,6 +81,8 @@ export default function AdminChecklistsPage() {
   const queryClient = useQueryClient();
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Checklist | null>(null);
+  const [profileFilter, setProfileFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data: checklists, isLoading } = useQuery<Checklist[]>({
     queryKey: ["checklists"],
@@ -172,6 +184,24 @@ export default function AdminChecklistsPage() {
     );
   }
 
+  const allChecklists = checklists ?? [];
+  const keyword = search.trim().toLowerCase();
+
+  const filteredChecklists = allChecklists
+    .filter((cl) => !profileFilter || cl.profiles.some((p) => p.id === profileFilter))
+    .filter((cl) => {
+      if (!keyword) return true;
+      if (cl.name.toLowerCase().includes(keyword)) return true;
+      if ((cl.description ?? "").toLowerCase().includes(keyword)) return true;
+      return cl.tasks.some(
+        (t) =>
+          t.title.toLowerCase().includes(keyword) ||
+          (t.description ?? "").toLowerCase().includes(keyword),
+      );
+    });
+
+  const isFiltering = !!profileFilter || !!keyword;
+
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-24">
       <PageHeader title="Checklists" subtitle="Gerencie os checklists operacionais">
@@ -189,78 +219,158 @@ export default function AdminChecklistsPage() {
         Novo Checklist
       </Button>
 
+      {/* Filters — só mostra quando há checklists */}
+      {allChecklists.length > 0 && (
+        <div className="space-y-3">
+          {(profiles ?? []).length > 1 && (
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setProfileFilter(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  !profileFilter
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border hover:bg-muted"
+                }`}
+              >
+                Todos os perfis
+              </button>
+              {(profiles ?? []).map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setProfileFilter(profileFilter === p.id ? null : p.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    profileFilter === p.id
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-card border-border hover:bg-muted"
+                  }`}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Buscar checklist ou tarefa..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-9 h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* List */}
-      {!checklists?.length ? (
+      {allChecklists.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <CheckSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhum checklist criado</p>
           <p className="text-sm mt-1">Crie o primeiro checklist operacional</p>
         </div>
+      ) : filteredChecklists.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Nenhum resultado encontrado</p>
+          <p className="text-sm mt-1">Tente outros termos ou remova os filtros</p>
+          {isFiltering && (
+            <button
+              onClick={() => { setProfileFilter(null); setSearch(""); }}
+              className="mt-3 text-sm text-primary hover:underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
       ) : (
         <div className="grid gap-3">
-          {checklists.map((cl) => (
-            <Card key={cl.id} className={!cl.is_active ? "opacity-60" : ""}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <Link
-                    href={`/admin/checklists/${cl.id}`}
-                    className="flex-1 min-w-0"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-base truncate">{cl.name}</h3>
-                      <Badge variant={cl.is_active ? "default" : "secondary"} className="shrink-0">
-                        {cl.is_active ? "Ativo" : "Inativo"}
-                      </Badge>
-                    </div>
-                    {cl.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
-                        {cl.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span>{cl._count.tasks} tarefa{cl._count.tasks !== 1 ? "s" : ""}</span>
-                      <span>·</span>
-                      <span>
-                        {cl.profiles.map((p) => p.name).join(", ") || "Sem perfis"}
-                      </span>
-                    </div>
-                  </Link>
-                  <div className="flex items-center gap-1 shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() =>
-                        toggleMutation.mutate({
-                          id: cl.id,
-                          is_active: !cl.is_active,
-                        })
-                      }
-                    >
-                      {cl.is_active ? (
-                        <ToggleRight className="w-4 h-4 text-emerald-500" />
-                      ) : (
-                        <ToggleLeft className="w-4 h-4" />
+          {filteredChecklists.map((cl) => {
+            const matchingTasks = keyword
+              ? cl.tasks.filter(
+                  (t) =>
+                    t.title.toLowerCase().includes(keyword) ||
+                    (t.description ?? "").toLowerCase().includes(keyword),
+                )
+              : [];
+
+            return (
+              <Card key={cl.id} className={!cl.is_active ? "opacity-60" : ""}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <Link href={`/admin/checklists/${cl.id}`} className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-base truncate">{cl.name}</h3>
+                        <Badge variant={cl.is_active ? "default" : "secondary"} className="shrink-0">
+                          {cl.is_active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </div>
+                      {cl.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-1 mb-2">
+                          {cl.description}
+                        </p>
                       )}
-                    </Button>
-                    <Link href={`/admin/checklists/${cl.id}`}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Pencil className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{cl._count.tasks} tarefa{cl._count.tasks !== 1 ? "s" : ""}</span>
+                        <span>·</span>
+                        <span>{cl.profiles.map((p) => p.name).join(", ") || "Sem perfis"}</span>
+                      </div>
                     </Link>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive"
-                      onClick={() => setDeleteTarget(cl)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => toggleMutation.mutate({ id: cl.id, is_active: !cl.is_active })}
+                      >
+                        {cl.is_active ? (
+                          <ToggleRight className="w-4 h-4 text-emerald-500" />
+                        ) : (
+                          <ToggleLeft className="w-4 h-4" />
+                        )}
+                      </Button>
+                      <Link href={`/admin/checklists/${cl.id}`}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => setDeleteTarget(cl)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                  {/* Tarefas que batem com a busca */}
+                  {matchingTasks.length > 0 && (
+                    <div className="mt-3 pt-3 border-t space-y-1">
+                      {matchingTasks.map((t) => (
+                        <div key={t.id} className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+                          <CheckSquare className="w-3 h-3 shrink-0 text-primary/60" />
+                          <span className="flex-1 truncate">{t.title}</span>
+                          {t.description && (
+                            <span className="truncate max-w-[160px] hidden sm:block">{t.description}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 

@@ -7,11 +7,31 @@ import {
   Trash2,
   GripVertical,
   Save,
+  Pencil,
+  X,
+  Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  useSortable,
+  arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -74,6 +94,9 @@ export default function EditChecklistPage() {
   const [selectedProfileIds, setSelectedProfileIds] = useState<string[]>([]);
   const [initialized, setInitialized] = useState(false);
 
+  // Local task order for optimistic DnD
+  const [localTasks, setLocalTasks] = useState<ChecklistTask[]>([]);
+
   // New task form
   const [newTitle, setNewTitle] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -109,6 +132,19 @@ export default function EditChecklistPage() {
       setInitialized(true);
     }
   }, [checklist, initialized]);
+
+  // Sync localTasks whenever server data changes
+  useEffect(() => {
+    if (checklist) {
+      setLocalTasks([...checklist.tasks].sort((a, b) => a.sort_order - b.sort_order));
+    }
+  }, [checklist]);
+
+  // DnD sensors — pointer for desktop, touch for mobile
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
 
   const updateMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
@@ -182,6 +218,36 @@ export default function EditChecklistPage() {
     },
     onError: (err: Error) => toast.error(err.message),
   });
+
+  const reorderMutation = useMutation({
+    mutationFn: async (order: string[]) => {
+      const res = await fetch(`/api/checklists/${id}/tasks/reorder`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order }),
+      });
+      if (!res.ok) throw new Error("Erro ao reordenar tarefas");
+      return res.json();
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+      // Revert local order on error
+      if (checklist) setLocalTasks([...checklist.tasks].sort((a, b) => a.sort_order - b.sort_order));
+    },
+  });
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setLocalTasks((prev) => {
+      const oldIndex = prev.findIndex((t) => t.id === active.id);
+      const newIndex = prev.findIndex((t) => t.id === over.id);
+      const reordered = arrayMove(prev, oldIndex, newIndex);
+      reorderMutation.mutate(reordered.map((t) => t.id));
+      return reordered;
+    });
+  }
 
   function saveHeaderChanges() {
     updateMutation.mutate({
@@ -305,7 +371,7 @@ export default function EditChecklistPage() {
       {/* Tasks section */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">Tarefas ({checklist.tasks.length})</h2>
+          <h2 className="text-lg font-bold">Tarefas ({localTasks.length})</h2>
           <Button size="sm" variant="outline" onClick={() => setShowAddTask(!showAddTask)}>
             <Plus className="w-4 h-4 mr-1" />
             Adicionar
@@ -404,24 +470,63 @@ export default function EditChecklistPage() {
           </Card>
         )}
 
-        {/* Existing tasks */}
-        {checklist.tasks.length === 0 ? (
+        {/* Sortable task list */}
+        {localTasks.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground text-sm">
             Nenhuma tarefa ainda. Adicione a primeira!
           </div>
         ) : (
-          checklist.tasks.map((task) => (
-            <TaskCard
-              key={task.id}
-              task={task}
-              onUpdate={(data) =>
-                updateTaskMutation.mutate({ taskId: task.id, data })
-              }
-              onDelete={() => deleteTaskMutation.mutate(task.id)}
-            />
-          ))
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={localTasks.map((t) => t.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-2">
+                {localTasks.map((task) => (
+                  <SortableTaskCard
+                    key={task.id}
+                    task={task}
+                    onUpdate={(data) => updateTaskMutation.mutate({ taskId: task.id, data })}
+                    onDelete={() => deleteTaskMutation.mutate(task.id)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Sortable Task Card ───────────────────────────────────────────────────────
+
+function SortableTaskCard({
+  task,
+  onUpdate,
+  onDelete,
+}: {
+  task: ChecklistTask;
+  onUpdate: (data: Record<string, any>) => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <TaskCard task={task} onUpdate={onUpdate} onDelete={onDelete} dragHandleProps={{ ...attributes, ...listeners }} />
     </div>
   );
 }
@@ -432,62 +537,138 @@ function TaskCard({
   task,
   onUpdate,
   onDelete,
+  dragHandleProps,
 }: {
   task: ChecklistTask;
   onUpdate: (data: Record<string, any>) => void;
   onDelete: () => void;
+  dragHandleProps: Record<string, any>;
 }) {
+  const [editing, setEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(task.title);
+  const [editDescription, setEditDescription] = useState(task.description ?? "");
+
   const timeSlotLabel =
     TIME_SLOTS.find((ts) => ts.value === task.time_slot)?.label ?? task.time_slot;
 
   const frequencyLabel =
     task.frequency === "DAILY"
       ? "Diário"
-      : `${task.days_of_week.map((d) => DAYS[d]).join(", ")}`;
+      : task.days_of_week.map((d) => DAYS[d]).join(", ");
+
+  function handleSaveEdit() {
+    if (!editTitle.trim()) return;
+    onUpdate({
+      title: editTitle.trim(),
+      description: editDescription.trim() || null,
+    });
+    setEditing(false);
+  }
+
+  function handleCancelEdit() {
+    setEditTitle(task.title);
+    setEditDescription(task.description ?? "");
+    setEditing(false);
+  }
 
   return (
     <Card className={!task.is_active ? "opacity-50" : ""}>
       <CardContent className="p-3">
-        <div className="flex items-start gap-2">
-          <GripVertical className="w-4 h-4 text-muted-foreground/30 mt-1 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-medium text-sm">{task.title}</span>
-              <Badge variant="secondary" className="text-[10px] shrink-0">
-                {timeSlotLabel}
-              </Badge>
-              {task.points > 1 && (
-                <Badge variant="outline" className="text-[10px] shrink-0">
-                  {task.points} pts
-                </Badge>
-              )}
+        {editing ? (
+          /* ── Edit mode ── */
+          <div className="space-y-2">
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder="Título"
+              autoFocus
+              className="text-sm"
+            />
+            <Textarea
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              placeholder="Descrição (opcional)"
+              rows={2}
+              className="text-sm"
+            />
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={handleSaveEdit}
+                disabled={!editTitle.trim()}
+                className="h-7 px-2 text-xs"
+              >
+                <Check className="w-3.5 h-3.5 mr-1" />
+                Salvar
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCancelEdit}
+                className="h-7 px-2 text-xs"
+              >
+                <X className="w-3.5 h-3.5 mr-1" />
+                Cancelar
+              </Button>
             </div>
-            {task.description && (
-              <p className="text-xs text-muted-foreground mb-1">{task.description}</p>
-            )}
-            <p className="text-[11px] text-muted-foreground">{frequencyLabel}</p>
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => onUpdate({ is_active: !task.is_active })}
+        ) : (
+          /* ── View mode ── */
+          <div className="flex items-start gap-2">
+            <button
+              {...dragHandleProps}
+              className="mt-0.5 shrink-0 cursor-grab active:cursor-grabbing touch-none"
+              aria-label="Arrastar para reordenar"
             >
-              <Badge variant={task.is_active ? "default" : "secondary"} className="text-[9px]">
-                {task.is_active ? "ON" : "OFF"}
-              </Badge>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 text-destructive"
-              onClick={onDelete}
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </Button>
+              <GripVertical className="w-4 h-4 text-muted-foreground/50 hover:text-muted-foreground transition-colors" />
+            </button>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-0.5">
+                <span className="font-medium text-sm">{task.title}</span>
+                <Badge variant="secondary" className="text-[10px] shrink-0">
+                  {timeSlotLabel}
+                </Badge>
+                {task.points > 1 && (
+                  <Badge variant="outline" className="text-[10px] shrink-0">
+                    {task.points} pts
+                  </Badge>
+                )}
+              </div>
+              {task.description && (
+                <p className="text-xs text-muted-foreground mb-0.5">{task.description}</p>
+              )}
+              <p className="text-[11px] text-muted-foreground">{frequencyLabel}</p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setEditing(true)}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => onUpdate({ is_active: !task.is_active })}
+              >
+                <Badge variant={task.is_active ? "default" : "secondary"} className="text-[9px]">
+                  {task.is_active ? "ON" : "OFF"}
+                </Badge>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

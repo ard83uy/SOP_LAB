@@ -9,6 +9,8 @@ import {
   Circle,
   Users,
   CalendarDays,
+  Search,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -25,6 +27,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 type TaskStatus = {
   task_id: string;
   title: string;
+  description: string | null;
   time_slot: string;
   completed: boolean;
   completed_at: string | null;
@@ -63,6 +66,8 @@ const TIME_SLOT_LABELS: Record<string, string> = {
 export default function ChecklistDashboardPage() {
   const today = new Date().toISOString().split("T")[0];
   const [selectedDate, setSelectedDate] = useState(today);
+  const [profileFilter, setProfileFilter] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   const { data, isLoading } = useQuery<DashboardResponse>({
     queryKey: ["checklist-dashboard", selectedDate],
@@ -88,8 +93,46 @@ export default function ChecklistDashboardPage() {
     );
   }
 
-  const summary = data?.summary ?? { total_tasks: 0, completed: 0, rate: 0 };
-  const profiles = data?.profiles ?? [];
+  const allProfiles = data?.profiles ?? [];
+
+  // Apply filters client-side
+  const keyword = search.trim().toLowerCase();
+  const filteredProfiles = allProfiles
+    .filter((p) => !profileFilter || p.profile_id === profileFilter)
+    .map((p) => ({
+      ...p,
+      users: p.users
+        .map((u) => ({
+          ...u,
+          tasks: keyword
+            ? u.tasks.filter(
+                (t) =>
+                  t.title.toLowerCase().includes(keyword) ||
+                  (t.description ?? "").toLowerCase().includes(keyword),
+              )
+            : u.tasks,
+        }))
+        .filter((u) => u.tasks.length > 0),
+    }))
+    .filter((p) => p.users.length > 0);
+
+  const totalTasks = filteredProfiles.reduce((s, p) => s + p.users.reduce((ss, u) => ss + u.total, 0), 0);
+  const totalCompleted = filteredProfiles.reduce((s, p) => s + p.users.reduce((ss, u) => ss + u.completed, 0), 0);
+
+  // When keyword is active, recount from filtered tasks
+  const filteredTotal = keyword
+    ? filteredProfiles.reduce((s, p) => s + p.users.reduce((ss, u) => ss + u.tasks.length, 0), 0)
+    : totalTasks;
+  const filteredCompleted = keyword
+    ? filteredProfiles.reduce(
+        (s, p) => s + p.users.reduce((ss, u) => ss + u.tasks.filter((t) => t.completed).length, 0),
+        0,
+      )
+    : totalCompleted;
+
+  const rate = filteredTotal > 0 ? filteredCompleted / filteredTotal : 0;
+
+  const isFiltering = !!profileFilter || !!keyword;
 
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-6 pb-24">
@@ -115,13 +158,13 @@ export default function ChecklistDashboardPage() {
         </div>
         <div className="flex items-center gap-3 ml-auto">
           <Badge variant="outline" className="text-sm px-3 py-1">
-            {summary.completed} / {summary.total_tasks} tarefas
+            {filteredCompleted} / {filteredTotal} tarefas
           </Badge>
           <Badge
-            variant={summary.rate >= 0.8 ? "default" : summary.rate >= 0.5 ? "secondary" : "destructive"}
+            variant={rate >= 0.8 ? "default" : rate >= 0.5 ? "secondary" : "destructive"}
             className="text-sm px-3 py-1"
           >
-            {Math.round(summary.rate * 100)}%
+            {Math.round(rate * 100)}%
           </Badge>
         </div>
       </div>
@@ -130,26 +173,87 @@ export default function ChecklistDashboardPage() {
       <div className="w-full bg-muted rounded-full h-3">
         <div
           className={`h-3 rounded-full transition-all duration-500 ${
-            summary.rate >= 0.8
-              ? "bg-emerald-500"
-              : summary.rate >= 0.5
-                ? "bg-yellow-500"
-                : "bg-red-500"
+            rate >= 0.8 ? "bg-emerald-500" : rate >= 0.5 ? "bg-yellow-500" : "bg-red-500"
           }`}
-          style={{ width: `${Math.round(summary.rate * 100)}%` }}
+          style={{ width: `${Math.round(rate * 100)}%` }}
         />
       </div>
 
+      {/* Filters */}
+      <div className="space-y-3">
+        {/* Profile filter */}
+        {allProfiles.length > 1 && (
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setProfileFilter(null)}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                !profileFilter
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-card border-border hover:bg-muted"
+              }`}
+            >
+              Todos os perfis
+            </button>
+            {allProfiles.map((p) => (
+              <button
+                key={p.profile_id}
+                onClick={() => setProfileFilter(profileFilter === p.profile_id ? null : p.profile_id)}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                  profileFilter === p.profile_id
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-card border-border hover:bg-muted"
+                }`}
+              >
+                {p.profile_name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Keyword search */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            placeholder="Buscar por título ou descrição da tarefa..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Per-profile cards */}
-      {profiles.length === 0 ? (
+      {allProfiles.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-medium">Nenhum dado para esta data</p>
           <p className="text-sm mt-1">Verifique se existem checklists ativos com perfis atribuídos</p>
         </div>
+      ) : filteredProfiles.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          <Search className="w-12 h-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">Nenhuma tarefa encontrada</p>
+          <p className="text-sm mt-1">Tente outros termos ou remova os filtros</p>
+          {isFiltering && (
+            <button
+              onClick={() => { setProfileFilter(null); setSearch(""); }}
+              className="mt-3 text-sm text-primary hover:underline"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
       ) : (
-        profiles.map((profile) => (
-          <ProfileCard key={profile.profile_id} profile={profile} />
+        filteredProfiles.map((profile) => (
+          <ProfileCard key={profile.profile_id} profile={profile} search={keyword} />
         ))
       )}
     </div>
@@ -158,11 +262,16 @@ export default function ChecklistDashboardPage() {
 
 // ── Profile Card ────────────────────────────────────────────────────────────
 
-function ProfileCard({ profile }: { profile: ProfileStats }) {
+function ProfileCard({ profile, search }: { profile: ProfileStats; search: string }) {
   const [expanded, setExpanded] = useState(false);
+  const isExpanded = expanded || !!search;
 
-  const totalCompleted = profile.users.reduce((s, u) => s + u.completed, 0);
-  const totalTasks = profile.users.reduce((s, u) => s + u.total, 0);
+  const totalCompleted = search
+    ? profile.users.reduce((s, u) => s + u.tasks.filter((t) => t.completed).length, 0)
+    : profile.users.reduce((s, u) => s + u.completed, 0);
+  const totalTasks = search
+    ? profile.users.reduce((s, u) => s + u.tasks.length, 0)
+    : profile.users.reduce((s, u) => s + u.total, 0);
   const rate = totalTasks > 0 ? totalCompleted / totalTasks : 0;
 
   return (
@@ -172,7 +281,7 @@ function ProfileCard({ profile }: { profile: ProfileStats }) {
           onClick={() => setExpanded(!expanded)}
           className="w-full p-4 flex items-center gap-3 text-left"
         >
-          {expanded ? (
+          {isExpanded ? (
             <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
           ) : (
             <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -205,10 +314,10 @@ function ProfileCard({ profile }: { profile: ProfileStats }) {
           </div>
         </button>
 
-        {expanded && (
+        {isExpanded && (
           <div className="border-t px-4 pb-4 space-y-3 pt-3">
             {profile.users.map((user) => (
-              <UserRow key={user.user_id} user={user} />
+              <UserRow key={user.user_id} user={user} search={search} />
             ))}
           </div>
         )}
@@ -219,9 +328,15 @@ function ProfileCard({ profile }: { profile: ProfileStats }) {
 
 // ── User Row ────────────────────────────────────────────────────────────────
 
-function UserRow({ user }: { user: UserStats }) {
+function UserRow({ user, search }: { user: UserStats; search: string }) {
   const [expanded, setExpanded] = useState(false);
-  const rate = user.total > 0 ? user.completed / user.total : 0;
+  const isExpanded = expanded || !!search;
+  const visibleTasks = user.tasks;
+  const visibleCompleted = search
+    ? visibleTasks.filter((t) => t.completed).length
+    : user.completed;
+  const visibleTotal = search ? visibleTasks.length : user.total;
+  const rate = visibleTotal > 0 ? visibleCompleted / visibleTotal : 0;
 
   return (
     <div className="bg-muted/30 rounded-lg">
@@ -229,14 +344,14 @@ function UserRow({ user }: { user: UserStats }) {
         onClick={() => setExpanded(!expanded)}
         className="w-full p-3 flex items-center gap-3 text-left"
       >
-        {expanded ? (
+        {isExpanded ? (
           <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         ) : (
           <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         )}
         <span className="flex-1 text-sm font-medium truncate">{user.user_name}</span>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {user.completed}/{user.total}
+          {visibleCompleted}/{visibleTotal}
         </span>
         <Badge
           variant={rate >= 0.8 ? "default" : rate >= 0.5 ? "secondary" : "destructive"}
@@ -246,7 +361,7 @@ function UserRow({ user }: { user: UserStats }) {
         </Badge>
       </button>
 
-      {expanded && (
+      {isExpanded && (
         <div className="px-3 pb-3 space-y-1">
           {user.tasks.map((task) => (
             <div
