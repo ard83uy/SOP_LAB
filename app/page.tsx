@@ -3,12 +3,18 @@ import { Store, ArrowRight, Flame } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 
 export default async function LandingPage() {
   const { userId } = await auth();
 
   if (userId) {
-    redirect("/admin/stations");
+    const user = await prisma.user.findUnique({
+      where: { clerk_user_id: userId },
+      select: { role: true },
+    });
+    const isAdmin = user?.role === "ADMIN" || user?.role === "MANAGER";
+    redirect(isAdmin ? "/admin/checklists" : "/staff/checklists");
   }
 
   return (

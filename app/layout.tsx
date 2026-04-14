@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "@/components/providers";
@@ -11,6 +11,10 @@ const plusJakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700", "800"],
 });
+
+export const viewport: Viewport = {
+  themeColor: "#c41432",
+};
 
 export const metadata: Metadata = {
   title: "SOP",
@@ -25,7 +29,6 @@ export const metadata: Metadata = {
     icon: "/icon-192.png",
     apple: "/icon-192.png",
   },
-  themeColor: "#c41432",
 };
 
 export default function RootLayout({
@@ -34,30 +37,30 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
-      <html
-        lang="pt-BR"
-        className={`${plusJakarta.variable} h-full antialiased`}
-        suppressHydrationWarning
-      >
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-          <meta name="apple-mobile-web-app-capable" content="yes" />
-          <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-          <meta name="apple-mobile-web-app-title" content="SOP" />
-          <link rel="manifest" href="/manifest.json" />
-          <link rel="icon" type="image/png" href="/icon-192.png" />
-          <link rel="apple-touch-icon" href="/icon-192.png" />
-          <meta name="theme-color" content="#c41432" />
-        </head>
-        <body className="min-h-full flex flex-col font-sans">
+    <html
+      lang="pt-BR"
+      className={`${plusJakarta.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="SOP" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/png" href="/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <meta name="theme-color" content="#c41432" />
+      </head>
+      <body className="min-h-full flex flex-col font-sans">
+        <ClerkProvider>
           <PWARegister />
           <Providers>
             {children}
             <Toaster />
           </Providers>
-        </body>
-      </html>
-    </ClerkProvider>
+        </ClerkProvider>
+      </body>
+    </html>
   );
 }

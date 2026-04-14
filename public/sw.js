@@ -40,6 +40,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+
+  // Don't cache auth-related pages or Clerk scripts
+  if (
+    url.pathname.startsWith('/sign-in') ||
+    url.pathname.startsWith('/sign-up') ||
+    url.hostname.includes('clerk')
+  ) {
+    return;
+  }
+
   // For API requests, use network-first strategy
   if (event.request.url.includes('/api/')) {
     event.respondWith(
