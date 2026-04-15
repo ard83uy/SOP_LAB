@@ -475,12 +475,12 @@ function TaskRow({
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className={`mt-0.5 shrink-0 transition-transform active:scale-90 ${justCompleted ? "animate-[check-bounce_0.5s_cubic-bezier(0.175,0.885,0.32,1.275)]" : ""}`}
+            className={`shrink-0 flex items-center justify-center w-10 h-10 -m-1 rounded-full transition-transform active:scale-90 ${justCompleted ? "animate-[check-bounce_0.5s_cubic-bezier(0.175,0.885,0.32,1.275)]" : ""}`}
           >
             {task.completed ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+              <CheckCircle2 className="w-7 h-7 text-emerald-500" />
             ) : (
-              <Circle className="w-5 h-5 text-muted-foreground/50 hover:text-primary transition-colors" />
+              <Circle className="w-7 h-7 text-muted-foreground/50 hover:text-primary transition-colors" />
             )}
           </button>
           <div
