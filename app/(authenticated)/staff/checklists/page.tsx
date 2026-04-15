@@ -129,35 +129,13 @@ export default function StaffChecklistsPage() {
     },
   });
 
-  function toggleTask(task: Task) {
-    if (!data) return;
-    if (task.completed) {
-      uncompleteMutation.mutate({ taskId: task.id, date: data.todayDate });
-    } else {
-      completeMutation.mutate({ taskId: task.id, date: data.todayDate });
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="h-4 w-32" />
-        <div className="space-y-3">
-          {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} className="h-16 w-full rounded-xl" />
-          ))}
-        </div>
-      </div>
-    );
-  }
-
+  // Derived state — safe to compute even while loading (data is undefined → defaults)
   const tasks = data?.tasks ?? [];
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.completed).length;
   const progressPercent = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-  // Milestone toasts
+  // Milestone toasts — must be before any conditional return
   const prevPercentRef = useRef<number | null>(null);
   useEffect(() => {
     if (totalTasks === 0) return;
@@ -176,7 +154,7 @@ export default function StaffChecklistsPage() {
       });
     } else if (prev < 100 && progressPercent >= 100) {
       toast.success("Dia completo! Arrasou! 🎉", { duration: 4000 });
-      
+
       const duration = 3000;
       const end = Date.now() + duration;
       const colors = ["#10b981", "#34d399", "#fcd34d"];
@@ -205,7 +183,7 @@ export default function StaffChecklistsPage() {
     prevPercentRef.current = progressPercent;
   }, [progressPercent, totalTasks]);
 
-  // Animate bar from 0 → actual on first data load
+  // Animate bar from 0 → actual on first data load — must be before any conditional return
   const [displayPercent, setDisplayPercent] = useState(0);
   const mountAnimDone = useRef(false);
   useEffect(() => {
@@ -217,6 +195,29 @@ export default function StaffChecklistsPage() {
     }
     setDisplayPercent(progressPercent);
   }, [progressPercent, totalTasks]);
+
+  function toggleTask(task: Task) {
+    if (!data) return;
+    if (task.completed) {
+      uncompleteMutation.mutate({ taskId: task.id, date: data.todayDate });
+    } else {
+      completeMutation.mutate({ taskId: task.id, date: data.todayDate });
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-4 w-32" />
+        <div className="space-y-3">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-xl" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   const percentColorClass =
     progressPercent >= 80
