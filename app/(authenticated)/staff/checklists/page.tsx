@@ -8,7 +8,6 @@ import {
   Trophy,
   Medal,
   Star,
-  Loader2,
   Sunrise,
   Sun,
   Sunset,
@@ -206,14 +205,18 @@ export default function StaffChecklistsPage() {
     prevPercentRef.current = progressPercent;
   }, [progressPercent, totalTasks]);
 
-  const barColorClass =
-    progressPercent >= 100
-      ? "bg-emerald-500"
-      : progressPercent >= 80
-        ? "bg-emerald-400"
-        : progressPercent >= 50
-          ? "bg-amber-400"
-          : "bg-primary";
+  // Animate bar from 0 → actual on first data load
+  const [displayPercent, setDisplayPercent] = useState(0);
+  const mountAnimDone = useRef(false);
+  useEffect(() => {
+    if (totalTasks === 0) return;
+    if (!mountAnimDone.current) {
+      mountAnimDone.current = true;
+      const t = setTimeout(() => setDisplayPercent(progressPercent), 80);
+      return () => clearTimeout(t);
+    }
+    setDisplayPercent(progressPercent);
+  }, [progressPercent, totalTasks]);
 
   const percentColorClass =
     progressPercent >= 80
@@ -276,17 +279,21 @@ export default function StaffChecklistsPage() {
           </div>
           <div className="flex-1 bg-muted rounded-full h-3 overflow-hidden">
             <div
-              className={`h-3 rounded-full transition-[width] duration-700 ease-out transition-[background-color] duration-500 ${barColorClass}`}
+              className="h-3 rounded-full transition-[width] duration-1000 ease-out"
               style={
                 progressPercent >= 100
                   ? {
-                      width: "100%",
+                      width: `${displayPercent}%`,
                       background:
                         "linear-gradient(90deg, #10b981 0%, #34d399 40%, #6ee7b7 60%, #10b981 100%)",
                       backgroundSize: "200% 100%",
                       animation: "progress-shimmer 2s linear infinite, progress-glow 2s ease-in-out infinite",
                     }
-                  : { width: `${progressPercent}%` }
+                  : {
+                      width: `${displayPercent}%`,
+                      background:
+                        "linear-gradient(90deg, #6366f1 0%, #06b6d4 50%, #10b981 100%)",
+                    }
               }
             />
           </div>
