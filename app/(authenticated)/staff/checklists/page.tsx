@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
+import confetti from "canvas-confetti";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -168,8 +169,39 @@ export default function StaffChecklistsPage() {
     const prev = prevPercentRef.current;
     if (prev < 50 && progressPercent >= 50 && progressPercent < 100) {
       toast.success("Metade do caminho! 🔥", { duration: 3000 });
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ["#10b981", "#3b82f6", "#f59e0b"]
+      });
     } else if (prev < 100 && progressPercent >= 100) {
       toast.success("Dia completo! Arrasou! 🎉", { duration: 4000 });
+      
+      const duration = 3000;
+      const end = Date.now() + duration;
+      const colors = ["#10b981", "#34d399", "#fcd34d"];
+
+      (function frame() {
+        confetti({
+          particleCount: 5,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0, y: 0.8 },
+          colors: colors,
+        });
+        confetti({
+          particleCount: 5,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1, y: 0.8 },
+          colors: colors,
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      })();
     }
     prevPercentRef.current = progressPercent;
   }, [progressPercent, totalTasks]);
@@ -216,11 +248,20 @@ export default function StaffChecklistsPage() {
           0%, 100% { box-shadow: 0 0 6px 0px rgba(16,185,129,0.4); }
           50% { box-shadow: 0 0 16px 3px rgba(16,185,129,0.7); }
         }
-        @keyframes bar-pop {
-          0% { transform: scaleY(1); }
-          40% { transform: scaleY(1.35); }
-          70% { transform: scaleY(0.9); }
-          100% { transform: scaleY(1); }
+        @keyframes scale-pop {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.1); }
+          100% { transform: scale(1); }
+        }
+        @keyframes check-bounce {
+          0% { transform: scale(0); opacity: 0; }
+          60% { transform: scale(1.3); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes row-complete-glow {
+          0% { box-shadow: 0 0 0 rgba(16,185,129,0); }
+          30% { box-shadow: 0 0 20px rgba(16,185,129,0.4); transform: scale(1.02); }
+          100% { box-shadow: 0 0 0 rgba(16,185,129,0); transform: scale(1); }
         }
       `}</style>
 
@@ -411,24 +452,35 @@ function TaskRow({
   isLoading: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [justCompleted, setJustCompleted] = useState(false);
+  const prevCompleted = useRef(task.completed);
+
+  useEffect(() => {
+    if (!prevCompleted.current && task.completed) {
+      setJustCompleted(true);
+      const timer = setTimeout(() => setJustCompleted(false), 1000);
+      return () => clearTimeout(timer);
+    }
+    prevCompleted.current = task.completed;
+  }, [task.completed]);
 
   return (
     <Card
-      className={`transition-all duration-300 ${
-        task.completed ? "bg-emerald-500/5 border-emerald-500/20" : ""
-      }`}
+      className={`transition-all duration-300 relative overflow-hidden ${
+        task.completed ? "bg-emerald-500/5 border-emerald-500/20" : "hover:border-primary/30"
+      } ${justCompleted ? "animate-[row-complete-glow_0.6s_ease-out]" : ""}`}
     >
       <CardContent className="p-3">
         <div className="flex items-start gap-3">
           <button
             onClick={onToggle}
             disabled={isLoading}
-            className="mt-0.5 shrink-0 transition-transform active:scale-90"
+            className={`mt-0.5 shrink-0 transition-transform active:scale-90 ${justCompleted ? "animate-[check-bounce_0.5s_cubic-bezier(0.175,0.885,0.32,1.275)]" : ""}`}
           >
             {task.completed ? (
               <CheckCircle2 className="w-5 h-5 text-emerald-500" />
             ) : (
-              <Circle className="w-5 h-5 text-muted-foreground/50" />
+              <Circle className="w-5 h-5 text-muted-foreground/50 hover:text-primary transition-colors" />
             )}
           </button>
           <div
@@ -436,9 +488,9 @@ function TaskRow({
             onClick={() => task.description && setExpanded(!expanded)}
           >
             <p
-              className={`text-sm font-medium leading-snug ${
+              className={`text-sm font-medium leading-snug transition-all duration-300 ${
                 task.completed
-                  ? "line-through text-muted-foreground"
+                  ? "line-through text-muted-foreground opacity-70"
                   : "text-foreground"
               }`}
             >
@@ -447,11 +499,11 @@ function TaskRow({
             <p className="text-[11px] text-muted-foreground mt-0.5">
               {task.checklist_name}
               {task.points > 1 && (
-                <span className="ml-1.5 font-semibold">· {task.points} pts</span>
+                <span className="ml-1.5 font-semibold text-primary/80">· {task.points} pts</span>
               )}
             </p>
             {expanded && task.description && (
-              <p className="text-xs text-muted-foreground mt-2 bg-muted/50 rounded-md p-2">
+              <p className="text-xs text-muted-foreground mt-2 bg-muted/50 rounded-md p-2 animate-in fade-in slide-in-from-top-1">
                 {task.description}
               </p>
             )}
