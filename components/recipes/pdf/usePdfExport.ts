@@ -4,6 +4,24 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { RecipePdfData } from "./RecipePdfDocument";
 
+// Converts an external image URL to a base64 data-URL so react-pdf can embed
+// it without running into CORS restrictions at render time.
+async function toBase64DataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export function usePdfExport() {
   const [isExporting, setIsExporting] = useState(false);
 
@@ -21,14 +39,21 @@ export function usePdfExport() {
         )
       );
 
-      const pdfData: RecipePdfData[] = responses.map((r) => ({
+      // Convert all photo URLs to base64 in parallel before building pdfData
+      const photoBase64s = await Promise.all(
+        responses.map((r) =>
+          r.photo_url ? toBase64DataUrl(r.photo_url) : Promise.resolve(null)
+        )
+      );
+
+      const pdfData: RecipePdfData[] = responses.map((r, i) => ({
         id: r.id,
         name: r.name,
         description: r.description ?? null,
         category: r.category,
         base_yield: r.base_yield,
         yield_unit: r.yield_unit,
-        photo_url: r.photo_url ?? null,
+        photo_url: photoBase64s[i],
         created_at: r.created_at,
         ingredients: r.ingredients.map((ing: any) => ({
           name: ing.prepItem?.name ?? ing.sourceRecipe?.name ?? "—",
