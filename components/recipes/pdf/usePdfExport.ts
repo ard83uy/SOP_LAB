@@ -4,11 +4,11 @@ import { useState, useCallback } from "react";
 import { toast } from "sonner";
 import type { RecipePdfData } from "./RecipePdfDocument";
 
-// Converts an external image URL to a base64 data-URL so react-pdf can embed
-// it without running into CORS restrictions at render time.
+// Fetches an image through our server-side proxy (avoids CORS on external URLs)
+// and converts it to a base64 data-URL that react-pdf can embed directly.
 async function toBase64DataUrl(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(`/api/image-proxy?url=${encodeURIComponent(url)}`);
     if (!res.ok) return null;
     const blob = await res.blob();
     return new Promise((resolve) => {
