@@ -3,10 +3,13 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   BookOpen, Plus, Egg, Utensils, Layers, ChefHat, Trash2,
+  CheckSquare, Square, FileDown, X, Check,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
+import { usePdfExport } from "@/components/recipes/pdf/usePdfExport";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -262,6 +265,27 @@ export default function FichasTecnicasPage() {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<RecipeCategory | "ALL">("ALL");
   const [createOpen, setCreateOpen] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const { exportPdf, isExporting } = usePdfExport();
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const selectAll = () => {
+    if (!filtered) return;
+    setSelectedIds(new Set(filtered.map((r) => r.id)));
+  };
 
   const { data: recipes, isLoading, error } = useQuery<Recipe[]>({
     queryKey: ["recipes"],
@@ -290,10 +314,32 @@ export default function FichasTecnicasPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6 pb-32">
-      <PageHeader title="Fichas Técnicas">
-        <Button onClick={() => setCreateOpen(true)} className="h-10 gap-2">
-          <Plus className="w-4 h-4" /> Nova Ficha
-        </Button>
+      <PageHeader title={selectionMode ? `${selectedIds.size} selecionada${selectedIds.size !== 1 ? "s" : ""}` : "Fichas Técnicas"}>
+        {selectionMode ? (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground" onClick={selectAll}>
+              <CheckSquare className="w-4 h-4" /> Todas
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={exitSelectionMode}>
+              <X className="w-4 h-4" /> Cancelar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 gap-2"
+              onClick={() => setSelectionMode(true)}
+              disabled={!recipes?.length}
+            >
+              <Square className="w-4 h-4" /> Selecionar
+            </Button>
+            <Button onClick={() => setCreateOpen(true)} className="h-10 gap-2">
+              <Plus className="w-4 h-4" /> Nova Ficha
+            </Button>
+          </div>
+        )}
       </PageHeader>
 
       {/* Category tabs */}
@@ -329,58 +375,99 @@ export default function FichasTecnicasPage() {
         />
       ) : (
         <div className="space-y-3">
-          {filtered.map((recipe) => (
-            <Card
-              key={recipe.id}
-              className="overflow-hidden cursor-pointer hover:border-primary/40 transition-colors active:scale-[0.99]"
-              onClick={() => router.push(`/admin/fichas-tecnicas/${recipe.id}`)}
-            >
-              <CardContent className="p-4 flex items-center gap-4">
-                {recipe.photo_url ? (
-                  <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
-                    <img src={recipe.photo_url} alt={recipe.name} className="w-full h-full object-cover" />
-                  </div>
-                ) : (
-                  <div className="w-16 h-16 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-                    <BookOpen className="w-6 h-6 text-muted-foreground/40" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-bold text-lg truncate">{recipe.name}</h3>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category]}`}>
-                      {CATEGORY_LABELS[recipe.category]}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-0.5">
-                    {recipe.base_yield} {recipe.yield_unit}
-                    {recipe.ingredients.length > 0 && ` · ${recipe.ingredients.length} ingredientes`}
-                    {recipe.steps.length > 0 && ` · ${recipe.steps.length} passos`}
-                    {recipe._count.comments > 0 && ` · ${recipe._count.comments} comentários`}
-                  </p>
-                  {recipe.description && (
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{recipe.description}</p>
+          {filtered.map((recipe) => {
+            const isSelected = selectedIds.has(recipe.id);
+            return (
+              <Card
+                key={recipe.id}
+                className={`overflow-hidden cursor-pointer transition-all active:scale-[0.99] ${
+                  selectionMode && isSelected
+                    ? "border-primary ring-2 ring-primary/20"
+                    : "hover:border-primary/40"
+                }`}
+                onClick={() => {
+                  if (selectionMode) {
+                    toggleSelection(recipe.id);
+                  } else {
+                    router.push(`/admin/fichas-tecnicas/${recipe.id}`);
+                  }
+                }}
+              >
+                <CardContent className="p-4 flex items-center gap-4">
+                  {recipe.photo_url ? (
+                    <div className="w-16 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0">
+                      <img src={recipe.photo_url} alt={recipe.name} className="w-full h-full object-cover" />
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+                      <BookOpen className="w-6 h-6 text-muted-foreground/40" />
+                    </div>
                   )}
-                </div>
-                <Button
-                  variant="ghost" size="icon"
-                  className="h-9 w-9 text-muted-foreground hover:text-destructive flex-shrink-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Excluir "${recipe.name}"?`)) {
-                      deleteMutation.mutate(recipe.id);
-                    }
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-bold text-lg truncate">{recipe.name}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category]}`}>
+                        {CATEGORY_LABELS[recipe.category]}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {recipe.base_yield} {recipe.yield_unit}
+                      {recipe.ingredients.length > 0 && ` · ${recipe.ingredients.length} ingredientes`}
+                      {recipe.steps.length > 0 && ` · ${recipe.steps.length} passos`}
+                      {recipe._count.comments > 0 && ` · ${recipe._count.comments} comentários`}
+                    </p>
+                    {recipe.description && (
+                      <p className="text-sm text-muted-foreground truncate mt-0.5">{recipe.description}</p>
+                    )}
+                  </div>
+
+                  {selectionMode ? (
+                    <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                      isSelected ? "border-primary bg-primary" : "border-border"
+                    }`}>
+                      {isSelected && <Check className="w-3.5 h-3.5 text-primary-foreground" />}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost" size="icon"
+                      className="h-9 w-9 text-muted-foreground hover:text-destructive flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Excluir "${recipe.name}"?`)) {
+                          deleteMutation.mutate(recipe.id);
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
       <CreateRecipeDialog open={createOpen} onClose={() => setCreateOpen(false)} />
+
+      {/* ── PDF export bar ── */}
+      {selectionMode && selectedIds.size > 0 && (
+        <div className="fixed bottom-16 left-0 right-0 z-20 p-4 bg-gradient-to-t from-background via-background to-transparent pb-[calc(1rem+env(safe-area-inset-bottom))]">
+          <div className="max-w-3xl mx-auto">
+            <Button
+              size="lg"
+              className="w-full h-14 text-base font-bold rounded-xl shadow-xl gap-2"
+              disabled={isExporting}
+              onClick={() => exportPdf(Array.from(selectedIds)).then(exitSelectionMode)}
+            >
+              <FileDown className="w-5 h-5" />
+              {isExporting
+                ? "Gerando PDF..."
+                : `Exportar ${selectedIds.size} ficha${selectedIds.size !== 1 ? "s" : ""} em PDF`}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
