@@ -143,6 +143,22 @@ const s = StyleSheet.create({
   section: {
     marginBottom: 20,
   },
+
+  // Two-column layout (ingredients | tools + tip)
+  twoCol: {
+    flexDirection: "row",
+    marginBottom: 20,
+  },
+  colLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  colRight: {
+    flex: 1,
+    paddingLeft: 12,
+    borderLeftWidth: 0.75,
+    borderLeftColor: "#e5e7eb",
+  },
   sectionTitle: {
     fontSize: 9,
     fontFamily: "Helvetica-Bold",
@@ -351,27 +367,60 @@ export function RecipePdfDocument({ recipes, printDate }: Props) {
               <Image style={s.photo} src={recipe.photo_url} />
             ) : null}
 
-            {/* ── Ingredients ── */}
-            {recipe.ingredients.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Ingredientes</Text>
-                <View style={s.tableHeader}>
-                  <Text style={[s.tableHeaderText, s.colName]}>Ingrediente</Text>
-                  <Text style={[s.tableHeaderText, s.colQty]}>Qtd.</Text>
-                  <Text style={[s.tableHeaderText, s.colUnit]}>Und.</Text>
-                </View>
-                {recipe.ingredients.map((ing, idx) => (
-                  <View
-                    key={idx}
-                    style={[s.tableRow, idx % 2 === 1 ? s.tableRowAlt : {}]}
-                  >
-                    <Text style={[s.tableText, s.colName]}>{ing.name}</Text>
-                    <Text style={[s.tableMuted, s.colQty]}>{ing.quantity}</Text>
-                    <Text style={[s.tableMuted, s.colUnit]}>{ing.unit}</Text>
+            {/* ── Ingredients | Tools + Tip (two-column) ── */}
+            <View style={s.twoCol}>
+
+              {/* Left: Ingredients */}
+              <View style={s.colLeft}>
+                {recipe.ingredients.length > 0 && (
+                  <View style={s.section}>
+                    <Text style={s.sectionTitle}>Ingredientes</Text>
+                    <View style={s.tableHeader}>
+                      <Text style={[s.tableHeaderText, s.colName]}>Ingrediente</Text>
+                      <Text style={[s.tableHeaderText, s.colQty]}>Qtd.</Text>
+                      <Text style={[s.tableHeaderText, s.colUnit]}>Und.</Text>
+                    </View>
+                    {recipe.ingredients.map((ing, idx) => (
+                      <View
+                        key={idx}
+                        style={[s.tableRow, idx % 2 === 1 ? s.tableRowAlt : {}]}
+                      >
+                        <Text style={[s.tableText, s.colName]}>{ing.name}</Text>
+                        <Text style={[s.tableMuted, s.colQty]}>{ing.quantity}</Text>
+                        <Text style={[s.tableMuted, s.colUnit]}>{ing.unit}</Text>
+                      </View>
+                    ))}
                   </View>
-                ))}
+                )}
               </View>
-            )}
+
+              {/* Right: Ferramentas (top) + Dica do Mestre (bottom) */}
+              <View style={s.colRight}>
+                {recipe.extras?.tools && recipe.extras.tools.length > 0 && (
+                  <View style={s.section}>
+                    <Text style={s.sectionTitle}>Ferramentas e Utensílios</Text>
+                    <View style={s.toolsRow}>
+                      {recipe.extras.tools.map((tool, idx) => (
+                        <View key={idx} style={s.toolBadge}>
+                          <Text style={s.toolBadgeText}>{tool}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {recipe.extras?.chefs_tip && (
+                  <View style={s.section}>
+                    <Text style={s.sectionTitle}>Dica do Mestre</Text>
+                    <View style={s.tipBox}>
+                      <Text style={s.tipLabel}>Chef</Text>
+                      <Text style={s.tipText}>{recipe.extras.chefs_tip}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+            </View>
 
             {/* ── Preparation steps ── */}
             {recipe.steps.length > 0 && (
@@ -388,37 +437,12 @@ export function RecipePdfDocument({ recipes, printDate }: Props) {
               </View>
             )}
 
-            {/* ── Ferramentas / Utensílios ── */}
-            {recipe.extras?.tools && recipe.extras.tools.length > 0 && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Ferramentas e Utensílios</Text>
-                <View style={s.toolsRow}>
-                  {recipe.extras.tools.map((tool, idx) => (
-                    <View key={idx} style={s.toolBadge}>
-                      <Text style={s.toolBadgeText}>{tool}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-
             {/* ── Atenção ── */}
             {recipe.extras?.attention && (
               <View style={s.section}>
                 <Text style={s.sectionTitle}>Atenção</Text>
                 <View style={s.attentionBox}>
                   <Text style={s.attentionText}>{recipe.extras.attention}</Text>
-                </View>
-              </View>
-            )}
-
-            {/* ── Dica do Mestre ── */}
-            {recipe.extras?.chefs_tip && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Dica do Mestre</Text>
-                <View style={s.tipBox}>
-                  <Text style={s.tipLabel}>Chef</Text>
-                  <Text style={s.tipText}>{recipe.extras.chefs_tip}</Text>
                 </View>
               </View>
             )}
