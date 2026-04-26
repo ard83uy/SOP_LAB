@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, ChevronRight, UserCog, LayoutDashboard } from "lucide-react";
+import { Users, ChevronRight, UserCog, LayoutDashboard, Wrench } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -23,6 +23,12 @@ const settingsItems = [
     icon: LayoutDashboard,
     label: "Praças",
     description: "Gerencie as praças e seus insumos",
+  },
+  {
+    href: "/admin/settings/kitchen-tools",
+    icon: Wrench,
+    label: "Ferramentas de Cozinha",
+    description: "Gerencie a lista de ferramentas disponíveis nas fichas técnicas",
   },
 ];
 

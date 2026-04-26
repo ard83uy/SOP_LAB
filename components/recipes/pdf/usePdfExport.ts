@@ -64,8 +64,10 @@ export function usePdfExport() {
           step_number: s.step_number,
           instruction: s.instruction,
         })),
-        // extras (tools, attention, chefs_tip) will be added here in the future
-        // when those fields are available in the recipe model
+        extras: {
+          tools: r.required_tools?.length ? r.required_tools : undefined,
+          chefs_tip: r.chefs_tip ?? undefined,
+        },
       }));
 
       const printDate = new Date().toLocaleString("pt-BR", {

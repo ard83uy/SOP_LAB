@@ -96,6 +96,8 @@ async function updateRecipeHandler(req: AppRequest, { params }: { params: { id: 
     if (data.yield_unit !== undefined) updateData.yield_unit = data.yield_unit;
     if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
     if (data.allowed_profile_ids !== undefined) updateData.allowed_profile_ids = data.allowed_profile_ids;
+    if (data.required_tools !== undefined) updateData.required_tools = data.required_tools;
+    if (data.chefs_tip !== undefined) updateData.chefs_tip = data.chefs_tip;
 
     return tx.recipe.update({
       where: { id: params.id },

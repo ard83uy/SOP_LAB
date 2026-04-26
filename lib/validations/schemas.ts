@@ -73,6 +73,8 @@ export const createRecipeSchema = z.object({
   yield_unit: z.string().min(1).max(20),
   photo_url: z.string().max(2048).optional(),
   allowed_profile_ids: z.array(z.string().uuid()).default([]),
+  required_tools: z.array(z.string().min(1).max(100)).default([]),
+  chefs_tip: z.string().max(2000).optional(),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),
@@ -94,6 +96,8 @@ export const updateRecipeSchema = z.object({
   yield_unit: z.string().min(1).max(20).optional(),
   photo_url: z.string().max(2048).nullable().optional(),
   allowed_profile_ids: z.array(z.string().uuid()).optional(),
+  required_tools: z.array(z.string().min(1).max(100)).optional(),
+  chefs_tip: z.string().max(2000).nullable().optional(),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),
@@ -105,6 +109,13 @@ export const updateRecipeSchema = z.object({
     step_number: z.number().int().positive(),
     instruction: z.string().min(1).max(2000),
   })).optional(),
+});
+
+// ── Kitchen Tools ────────────────────────────────────────────────────────────
+
+export const createKitchenToolSchema = z.object({
+  name: z.string().min(1).max(100),
+  sort_order: z.number().int().min(0).optional(),
 });
 
 export const createRecipeCommentSchema = z.object({

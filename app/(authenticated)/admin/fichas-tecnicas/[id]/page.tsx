@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import {
   ArrowLeft, Plus, Trash2, GripVertical, Save,
   ChefHat, MessageSquare, ImageIcon, ListOrdered,
-  Minus, PackagePlus,
+  Minus, PackagePlus, Wrench, Pencil, Check, X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -60,9 +60,16 @@ type Recipe = {
   yield_unit: string;
   photo_url: string | null;
   allowed_profile_ids: string[];
+  required_tools: string[];
+  chefs_tip: string | null;
   ingredients: Ingredient[];
   steps: Step[];
   comments: Comment[];
+};
+
+type KitchenTool = {
+  id: string;
+  name: string;
 };
 
 type UserProfile = {
@@ -217,10 +224,14 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   const [steps, setSteps] = useState<Step[]>([]);
   const [photoUrl, setPhotoUrl] = useState("");
   const [allowedProfileIds, setAllowedProfileIds] = useState<string[]>([]);
+  const [requiredTools, setRequiredTools] = useState<string[]>([]);
+  const [chefsTip, setChefsTip] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [customYield, setCustomYield] = useState<string>("");
   const [dirty, setDirty] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState("");
 
   const { data: recipe, isLoading } = useQuery<Recipe>({
     queryKey: ["recipe", id],
@@ -238,9 +249,21 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     setSteps(recipe.steps);
     setPhotoUrl(recipe.photo_url ?? "");
     setAllowedProfileIds(recipe.allowed_profile_ids);
+    setRequiredTools(recipe.required_tools ?? []);
+    setChefsTip(recipe.chefs_tip ?? "");
+    setNameValue(recipe.name);
     setCustomYield(String(recipe.base_yield));
     setInitialized(true);
   }
+
+  const { data: kitchenTools = [] } = useQuery<KitchenTool[]>({
+    queryKey: ["kitchen-tools"],
+    queryFn: async () => {
+      const res = await fetch("/api/kitchen-tools");
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   // Scaling
   const scale = recipe ? (parseFloat(customYield) || recipe.base_yield) / recipe.base_yield : 1;
@@ -256,8 +279,11 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          name: nameValue.trim() || undefined,
           photo_url: photoUrl.trim() || null,
           allowed_profile_ids: allowedProfileIds,
+          required_tools: requiredTools,
+          chefs_tip: chefsTip.trim() || null,
           ingredients: ingredients.map((ing, idx) => ({
             prep_item_id: ing.prep_item_id || undefined,
             source_recipe_id: ing.source_recipe_id || undefined,
@@ -381,18 +407,52 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto pb-32 space-y-8">
-      <PageHeader title={recipe.name}>
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => router.push("/admin/fichas-tecnicas")}>
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category] ?? ""}`}>
-            {CATEGORY_LABELS[recipe.category]}
-          </span>
+      {/* ── Name / header ── */}
+      <div className="flex items-start gap-3">
+        <Button variant="ghost" size="icon" className="mt-1 flex-shrink-0" onClick={() => router.push("/admin/fichas-tecnicas")}>
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <div className="flex-1 min-w-0">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                className="text-2xl font-bold bg-transparent border-b-2 border-primary outline-none w-full"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { setEditingName(false); setDirty(true); }
+                  if (e.key === "Escape") { setNameValue(recipe.name); setEditingName(false); }
+                }}
+              />
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => { setEditingName(false); setDirty(true); }}>
+                <Check className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setNameValue(recipe.name); setEditingName(false); }}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h1 className="text-2xl font-bold truncate">{nameValue}</h1>
+              <Button
+                variant="ghost" size="icon"
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
+                onClick={() => setEditingName(true)}
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+          <div className="flex items-center gap-2 mt-1">
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category] ?? ""}`}>
+              {CATEGORY_LABELS[recipe.category]}
+            </span>
+          </div>
         </div>
-      </PageHeader>
+      </div>
       {recipe.description && (
-        <p className="text-sm text-muted-foreground -mt-6">{recipe.description}</p>
+        <p className="text-sm text-muted-foreground">{recipe.description}</p>
       )}
 
       {/* Yield scaler */}
@@ -562,6 +622,65 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
             ))}
           </div>
         )}
+      </section>
+
+      {/* ── Ferramentas Necessárias ──────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <Wrench className="w-5 h-5 text-primary" /> Ferramentas Necessárias
+        </h2>
+        {kitchenTools.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma ferramenta cadastrada ainda. Adicione em{" "}
+            <a href="/admin/settings/kitchen-tools" className="underline text-primary">
+              Configurações → Ferramentas
+            </a>.
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {kitchenTools.map((tool) => {
+              const selected = requiredTools.includes(tool.name);
+              return (
+                <button
+                  key={tool.id}
+                  type="button"
+                  onClick={() => {
+                    setRequiredTools((prev) =>
+                      prev.includes(tool.name)
+                        ? prev.filter((t) => t !== tool.name)
+                        : [...prev, tool.name]
+                    );
+                    setDirty(true);
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors flex items-center gap-1.5 ${
+                    selected
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  {tool.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ── Dica do Chef ────────────────────────────────────────────────────── */}
+      <section className="space-y-3">
+        <h2 className="text-lg font-bold flex items-center gap-2">
+          <ChefHat className="w-5 h-5 text-primary" /> Dica do Chef
+        </h2>
+        <Textarea
+          className="resize-none min-h-[80px] text-base"
+          placeholder="Compartilhe uma dica especial sobre esta receita..."
+          value={chefsTip}
+          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+            setChefsTip(e.target.value);
+            setDirty(true);
+          }}
+        />
       </section>
 
       {/* ── Photo ───────────────────────────────────────────────────────────── */}

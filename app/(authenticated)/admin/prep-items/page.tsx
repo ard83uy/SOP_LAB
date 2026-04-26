@@ -153,11 +153,12 @@ function PrepItemCard({ item, onEdit, onDelete }: {
 // ── Create / Edit dialog ───────────────────────────────────────────────────
 
 function ItemFormDialog({
-  open, onClose, editItem,
+  open, onClose, editItem, isAdmin = false,
 }: {
   open: boolean;
   onClose: () => void;
   editItem: PrepItem | null;
+  isAdmin?: boolean;
 }) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ name: "", unit: "kg", target_quantity: "" });
@@ -179,11 +180,15 @@ function ItemFormDialog({
       if (!form.name.trim() || !qty || qty <= 0) throw new Error("Preencha todos os campos corretamente.");
 
       if (editItem) {
-        // PATCH: only update target_quantity (name/unit are immutable)
+        // PATCH: update target_quantity; only admin can update name
+        const body: Record<string, any> = { target_quantity: qty };
+        if (isAdmin && form.name.trim() !== editItem.name) {
+          body.name = form.name.trim();
+        }
         const res = await fetch(`/api/prep-items/${editItem.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ target_quantity: qty }),
+          body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error((await res.json()).error || "Erro");
         return res.json();
@@ -217,7 +222,7 @@ function ItemFormDialog({
             <Input
               className="h-12 text-lg"
               placeholder="Ex: Tomate Fatiado"
-              disabled={!!editItem}
+              disabled={!!editItem && !isAdmin}
               value={form.name}
               onChange={(e) => setForm((v) => ({ ...v, name: e.target.value }))}
             />
@@ -375,6 +380,17 @@ export default function AdminPrepItemsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editItem, setEditItem] = useState<PrepItem | null>(null);
 
+  const { data: user } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/me");
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
+  });
+
+  const isManagerOrAbove = user?.role === "ADMIN" || user?.role === "MANAGER";
+
   const { data: items, isLoading, error: itemsError } = useQuery<PrepItem[]>({
     queryKey: ["all-prep-items"],
     queryFn: async () => {
@@ -467,7 +483,7 @@ export default function AdminPrepItemsPage() {
 
       {tab === "requests" && <RequestsPanel />}
 
-      <ItemFormDialog open={dialogOpen} onClose={() => setDialogOpen(false)} editItem={editItem} />
+      <ItemFormDialog open={dialogOpen} onClose={() => setDialogOpen(false)} editItem={editItem} isAdmin={isManagerOrAbove} />
     </div>
   );
 }

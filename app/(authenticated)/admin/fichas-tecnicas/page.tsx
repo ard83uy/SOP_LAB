@@ -333,7 +333,7 @@ export default function FichasTecnicasPage() {
               onClick={() => setSelectionMode(true)}
               disabled={!recipes?.length}
             >
-              <Square className="w-4 h-4" /> Selecionar
+              <Square className="w-4 h-4" /> Exportar
             </Button>
             <Button onClick={() => setCreateOpen(true)} className="h-10 gap-2">
               <Plus className="w-4 h-4" /> Nova Ficha
