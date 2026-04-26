@@ -9,6 +9,15 @@ import {
   ChefHat, MessageSquare, ImageIcon, ListOrdered,
   Minus, PackagePlus, Wrench, Pencil, Check, X,
 } from "lucide-react";
+import {
+  DndContext, closestCenter, PointerSensor, TouchSensor,
+  useSensor, useSensors, type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext, verticalListSortingStrategy,
+  useSortable, arrayMove,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +38,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 
 type Ingredient = {
   id?: string;
+  _key: string;
   prep_item_id: string | null;
   source_recipe_id: string | null;
   quantity: number;
@@ -93,6 +103,89 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const UNITS = ["kg", "g", "L", "ml", "un", "porções", "colher(es)", "xícara(s)", "pitada(s)"];
 
+
+// ── Sortable ingredient row ──────────────────────────────────────────────────
+
+function SortableIngredientRow({
+  ingredient, idx, scale, scaledQty, updateIngredient, removeIngredient,
+}: {
+  ingredient: Ingredient;
+  idx: number;
+  scale: number;
+  scaledQty: (qty: number) => number;
+  updateIngredient: (idx: number, field: string, value: any) => void;
+  removeIngredient: (idx: number) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: ingredient._key,
+  });
+
+  const displayName = ingredient.prepItem?.name ?? ingredient.sourceRecipe?.name ?? "—";
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 10 : undefined,
+        position: "relative",
+      }}
+      className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-4 py-3 border-t items-center bg-background"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+        <div className="min-w-0">
+          <span className="font-medium text-sm truncate block">{displayName}</span>
+          {ingredient.sourceRecipe && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[ingredient.sourceRecipe.category] ?? ""}`}>
+              {CATEGORY_LABELS[ingredient.sourceRecipe.category]}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <DecimalInput
+          className="h-9 w-20 text-center text-sm font-semibold"
+          value={String(ingredient.quantity)}
+          onChange={(e) => {
+            const val = parseFloat(e.target.value);
+            if (!isNaN(val)) updateIngredient(idx, "quantity", val);
+            else if (e.target.value === "") updateIngredient(idx, "quantity", 0);
+          }}
+        />
+        <Select
+          value={ingredient.unit}
+          onValueChange={(v) => updateIngredient(idx, "unit", v)}
+        >
+          <SelectTrigger className="h-9 w-20 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <span className="text-right font-bold text-sm tabular-nums whitespace-nowrap">
+        {scale !== 1 ? `${scaledQty(ingredient.quantity)} ${ingredient.unit}` : ingredient.unit}
+      </span>
+      <Button
+        variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+        onClick={() => removeIngredient(idx)}
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </Button>
+    </div>
+  );
+}
 
 // ── Ingredient source picker ─────────────────────────────────────────────────
 
@@ -245,7 +338,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   // Sync state from fetched data
   const [initialized, setInitialized] = useState(false);
   if (recipe && !initialized) {
-    setIngredients(recipe.ingredients);
+    setIngredients(recipe.ingredients.map((ing) => ({ ...ing, _key: ing.id ?? crypto.randomUUID() })));
     setSteps(recipe.steps);
     setPhotoUrl(recipe.photo_url ?? "");
     setAllowedProfileIds(recipe.allowed_profile_ids);
@@ -330,6 +423,7 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   // Ingredient helpers
   const addIngredient = (source: IngredientSource) => {
     const newIng: Ingredient = {
+      _key: crypto.randomUUID(),
       prep_item_id: source.type === "prep_item" ? source.id : null,
       source_recipe_id: source.type === "recipe" ? source.id : null,
       quantity: 0,
@@ -350,6 +444,23 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   const removeIngredient = (idx: number) => {
     setIngredients((ings) => ings.filter((_, i) => i !== idx));
     setDirty(true);
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      setIngredients((ings) => {
+        const oldIdx = ings.findIndex((i) => i._key === active.id);
+        const newIdx = ings.findIndex((i) => i._key === over.id);
+        return arrayMove(ings, oldIdx, newIdx);
+      });
+      setDirty(true);
+    }
   };
 
   // Step helpers
@@ -523,55 +634,21 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
               <span className="text-right">{scale !== 1 ? "Ajustado" : "Und."}</span>
               <span></span>
             </div>
-            {ingredients.map((ing, idx) => {
-              const displayName = ing.prepItem?.name ?? ing.sourceRecipe?.name ?? "—";
-              return (
-                <div key={idx} className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 px-4 py-3 border-t items-center">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <GripVertical className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
-                    <div className="min-w-0">
-                      <span className="font-medium text-sm truncate block">{displayName}</span>
-                      {ing.sourceRecipe && (
-                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${CATEGORY_COLORS[ing.sourceRecipe.category] ?? ""}`}>
-                          {CATEGORY_LABELS[ing.sourceRecipe.category]}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <DecimalInput
-                      className="h-9 w-20 text-center text-sm font-semibold"
-                      value={String(ing.quantity)}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        if (!isNaN(val)) updateIngredient(idx, "quantity", val);
-                        else if (e.target.value === "") updateIngredient(idx, "quantity", 0);
-                      }}
-                    />
-                    <Select
-                      value={ing.unit}
-                      onValueChange={(v) => updateIngredient(idx, "unit", v)}
-                    >
-                      <SelectTrigger className="h-9 w-20 text-xs">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <span className="text-right font-bold text-sm tabular-nums whitespace-nowrap">
-                    {scale !== 1 ? `${scaledQty(ing.quantity)} ${ing.unit}` : ing.unit}
-                  </span>
-                  <Button
-                    variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeIngredient(idx)}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
-              );
-            })}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={ingredients.map((i) => i._key)} strategy={verticalListSortingStrategy}>
+                {ingredients.map((ing, idx) => (
+                  <SortableIngredientRow
+                    key={ing._key}
+                    ingredient={ing}
+                    idx={idx}
+                    scale={scale}
+                    scaledQty={scaledQty}
+                    updateIngredient={updateIngredient}
+                    removeIngredient={removeIngredient}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
           </div>
         )}
       </section>
