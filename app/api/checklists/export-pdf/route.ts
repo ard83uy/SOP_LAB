@@ -72,13 +72,22 @@ async function exportPdfHandler(req: AppRequest) {
 
   // Generate PDF — cast needed: renderToBuffer expects DocumentProps ReactElement
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pdfBuffer = await renderToBuffer(
-    createElement(ChecklistPdfDocument, {
-      checklists: filteredChecklists,
-      profileName: profile.name,
-      restaurantName: tenant?.name,
-    }) as any,
-  );
+  let pdfBuffer;
+  try {
+    pdfBuffer = await renderToBuffer(
+      createElement(ChecklistPdfDocument, {
+        checklists: filteredChecklists,
+        profileName: profile.name,
+        restaurantName: tenant?.name,
+      }) as any,
+    );
+  } catch (err: any) {
+    req.logger.error({ err: err.message, stack: err.stack }, "Erro ao renderizar PDF");
+    return NextResponse.json(
+      { error: "Falha técnica ao gerar o PDF", details: err.message },
+      { status: 500 },
+    );
+  }
 
   const fileName = `checklist-${profile.name.toLowerCase().replace(/\s+/g, "-")}-${
     new Date().toISOString().split("T")[0]

@@ -109,7 +109,10 @@ function ExportPdfDialog({ open, onClose, checklists, profiles }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile_id: selectedProfileId, checklist_ids: [...selectedChecklistIds] }),
       });
-      if (!res.ok) throw new Error("Erro ao gerar PDF");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.details || errData.error || "Erro ao gerar PDF");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

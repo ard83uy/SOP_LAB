@@ -1,4 +1,4 @@
-"use client";
+
 
 import {
   Document,
@@ -48,8 +48,9 @@ const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 function getFrequencyLabel(task: PdfTask): string {
   if (task.frequency === "DAILY") return "Diário";
-  if (task.days_of_week.length === 0) return "Dias específicos";
-  return task.days_of_week.map((d) => DAY_NAMES[d]).join(", ");
+  const days = task.days_of_week || [];
+  if (days.length === 0) return "Dias específicos";
+  return days.map((d) => DAY_NAMES[d] || d).join(", ");
 }
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -349,14 +350,16 @@ const styles = StyleSheet.create({
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function ChecklistPdfDocument({ checklists, profileName, restaurantName }: Props) {
-  const today = new Date().toLocaleDateString("pt-BR", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  const d = new Date();
+  const day = d.getDate().toString().padStart(2, "0");
+  const month = (d.getMonth() + 1).toString().padStart(2, "0");
+  const year = d.getFullYear();
+  const today = `${day}/${month}/${year}`;
 
-  const totalTasks = checklists.reduce((sum, cl) => sum + cl.tasks.length, 0);
+  const totalTasks = (checklists || []).reduce(
+    (sum, cl) => sum + (cl.tasks?.length || 0),
+    0,
+  );
 
   return (
     <Document
