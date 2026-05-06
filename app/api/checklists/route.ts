@@ -15,7 +15,7 @@ async function listChecklistsHandler(req: AppRequest) {
 
   const checklists = await prisma.checklist.findMany({
     where: { tenant_id },
-    orderBy: { created_at: "desc" },
+    orderBy: [{ sort_order: "asc" }, { created_at: "asc" }],
     include: {
       profiles: { select: { id: true, name: true } },
       tasks: {
