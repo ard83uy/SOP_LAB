@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { LayoutDashboard, CheckCircle2, Package, ChefHat, Plus, ClipboardList, History } from "lucide-react";
+import { LayoutDashboard, CheckCircle2, Package, ChefHat, Plus, ClipboardList, History, BookOpen } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -52,6 +53,17 @@ const submitCountSchema = z.object({
 export default function HandoverPage() {
   const queryClient = useQueryClient();
   const [selectedStation, setSelectedStation] = useState<any>(null);
+
+  const { data: currentUser } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await fetch("/api/users/me");
+      if (!res.ok) throw new Error("Failed to fetch user");
+      return res.json();
+    },
+  });
+  const isManagerOrAbove = currentUser?.role === "ADMIN" || currentUser?.role === "MANAGER";
+
   const [successData, setSuccessData] = useState<any>(null);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestForm, setRequestForm] = useState({ name: "", unit: "kg", note: "" });
@@ -418,11 +430,36 @@ export default function HandoverPage() {
                   const itemInfo = prepItems.find((p: any) => p.id === field.prep_item_id);
                   if (!itemInfo) return null;
 
+                  const hasRecipe = !!(itemInfo.recipe_id && itemInfo.recipe);
+                  const recipePillClass = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wide";
+
                   return (
                     <Card key={field.id} className="overflow-hidden shadow-sm">
                       <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1">
-                          <h3 className="font-bold text-2xl">{itemInfo.name}</h3>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-2xl">{itemInfo.name}</h3>
+                            {hasRecipe && (
+                              isManagerOrAbove ? (
+                                <Link
+                                  href={`/admin/fichas-tecnicas/${itemInfo.recipe_id}`}
+                                  className={`${recipePillClass} hover:bg-primary/20 transition-colors`}
+                                  title={`Ver ficha técnica de ${itemInfo.recipe.name}`}
+                                >
+                                  <BookOpen className="w-3 h-3" />
+                                  Ficha Técnica
+                                </Link>
+                              ) : (
+                                <span
+                                  className={recipePillClass}
+                                  title="Produto manipulado com ficha técnica"
+                                >
+                                  <BookOpen className="w-3 h-3" />
+                                  Ficha Técnica
+                                </span>
+                              )
+                            )}
+                          </div>
                           <p className="text-muted-foreground text-lg">Utilização média: <span className="font-semibold text-foreground">{itemInfo.effective_target} {itemInfo.unit}</span>{itemInfo.effective_target !== itemInfo.target_quantity && <span className="text-xs ml-1 text-amber-600">(dia específico)</span>}</p>
                           {itemInfo.current_quantity != null && (
                             <p className="text-blue-600 text-base font-medium mt-0.5">

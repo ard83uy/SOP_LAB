@@ -10,6 +10,7 @@ const updateSchema = z.object({
   target_quantity: z.number().positive().optional(),
   name: z.string().min(2).max(100).optional(),
   unit: z.string().min(1).max(20).optional(),
+  category: z.enum(["PRIMARY", "MANIPULATED", "INTERMEDIATE", "FINAL"]).optional(),
 });
 
 export const PATCH = compose(

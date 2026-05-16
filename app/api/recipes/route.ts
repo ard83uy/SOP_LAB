@@ -16,13 +16,22 @@ async function listRecipesHandler(req: AppRequest) {
 
   const isAdminOrManager = role === "ADMIN" || role === "MANAGER";
 
+  const url = new URL(req.url);
+  const layoutParam = url.searchParams.get("layout");
+  const validLayouts = ["FOOD", "DRINK"] as const;
+  const layoutFilter =
+    layoutParam && (validLayouts as readonly string[]).includes(layoutParam)
+      ? (layoutParam as typeof validLayouts[number])
+      : undefined;
+
   const recipes = await prisma.recipe.findMany({
     where: {
       tenant_id,
+      ...(layoutFilter ? { layout: layoutFilter } : {}),
       ...(!isAdminOrManager && profile_id
         ? { allowed_profile_ids: { has: profile_id } }
         : {}),
-    },
+    } as any,
     orderBy: [{ category: "asc" }, { name: "asc" }],
     include: {
       ingredients: {
@@ -33,6 +42,8 @@ async function listRecipesHandler(req: AppRequest) {
         },
       },
       steps: { orderBy: { step_number: "asc" } },
+      glassType: { select: { id: true, name: true, photo_url: true } } as any,
+      promotedAs: { select: { id: true, target_quantity: true, stations: { select: { id: true, name: true } } } } as any,
       _count: { select: { comments: true } },
     },
   });
@@ -44,7 +55,10 @@ async function listRecipesHandler(req: AppRequest) {
 
 async function createRecipeHandler(req: AppRequest) {
   const tenant_id = req.ctx.tenant_id!;
-  const { name, description, category, base_yield, yield_unit, photo_url, allowed_profile_ids, ingredients, steps } = req.ctx.parsedBody;
+  const {
+    name, description, category, layout, base_yield, yield_unit, photo_url, glass_type_id,
+    allowed_profile_ids, required_tools, chefs_tip, decoration, ingredients, steps,
+  } = req.ctx.parsedBody;
 
   const existing = await prisma.recipe.findUnique({
     where: { tenant_id_name: { tenant_id, name } },
@@ -57,16 +71,22 @@ async function createRecipeHandler(req: AppRequest) {
     );
   }
 
+  const resolvedLayout = layout ?? "FOOD";
   const recipe = await prisma.recipe.create({
     data: {
       tenant_id,
       name,
       description: description ?? null,
       category,
+      layout: resolvedLayout,
       base_yield,
       yield_unit,
       photo_url: photo_url ?? null,
+      glass_type_id: resolvedLayout === "DRINK" ? (glass_type_id ?? null) : null,
       allowed_profile_ids: allowed_profile_ids ?? [],
+      required_tools: required_tools ?? [],
+      chefs_tip: chefs_tip ?? null,
+      decoration: resolvedLayout === "DRINK" ? (decoration ?? null) : null,
       ingredients: ingredients?.length
         ? { create: ingredients.map((ing: any, idx: number) => ({
             prep_item_id: ing.prep_item_id ?? null,
@@ -92,10 +112,11 @@ async function createRecipeHandler(req: AppRequest) {
         },
       },
       steps: { orderBy: { step_number: "asc" } },
+      glassType: { select: { id: true, name: true, photo_url: true } } as any,
     },
   });
 
-  req.logger.info({ id: recipe.id, name }, "Ficha técnica criada");
+  req.logger.info({ id: recipe.id, name, layout: resolvedLayout }, "Ficha técnica criada");
   return NextResponse.json(recipe, { status: 201 });
 }
 

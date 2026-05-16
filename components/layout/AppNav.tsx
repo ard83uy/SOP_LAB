@@ -9,7 +9,7 @@ export function AppNav() {
 
   // Show a sticky placeholder while the role is unknown to prevent layout shift
   if (isLoading) {
-    return <div className="sticky top-0 z-50 h-14 bg-card border-b border-border" />;
+    return <div className="sticky top-0 z-50 h-16 bg-card border-b border-border" />;
   }
 
   return isAdmin ? <TopNav /> : <BottomNav />;

@@ -25,11 +25,12 @@ async function getRecipeHandler(req: AppRequest, { params }: { params: { id: str
         },
       },
       steps: { orderBy: { step_number: "asc" } },
+      glassType: { select: { id: true, name: true, photo_url: true } } as any,
       comments: {
         orderBy: { created_at: "desc" },
         include: { user: { select: { name: true } } },
       },
-    },
+    } as any,
   });
 
   if (!recipe) {
@@ -92,12 +93,21 @@ async function updateRecipeHandler(req: AppRequest, { params }: { params: { id: 
     if (data.name !== undefined) updateData.name = data.name;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.category !== undefined) updateData.category = data.category;
+    if (data.layout !== undefined) updateData.layout = data.layout;
     if (data.base_yield !== undefined) updateData.base_yield = data.base_yield;
     if (data.yield_unit !== undefined) updateData.yield_unit = data.yield_unit;
     if (data.photo_url !== undefined) updateData.photo_url = data.photo_url;
+    if (data.glass_type_id !== undefined) updateData.glass_type_id = data.glass_type_id;
     if (data.allowed_profile_ids !== undefined) updateData.allowed_profile_ids = data.allowed_profile_ids;
     if (data.required_tools !== undefined) updateData.required_tools = data.required_tools;
     if (data.chefs_tip !== undefined) updateData.chefs_tip = data.chefs_tip;
+    if (data.decoration !== undefined) updateData.decoration = data.decoration;
+
+    // Clear DRINK-specific fields if switching layout away from DRINK
+    if (data.layout !== undefined && data.layout !== "DRINK") {
+      updateData.glass_type_id = null;
+      updateData.decoration = null;
+    }
 
     return tx.recipe.update({
       where: { id: params.id },
@@ -111,6 +121,7 @@ async function updateRecipeHandler(req: AppRequest, { params }: { params: { id: 
           },
         },
         steps: { orderBy: { step_number: "asc" } },
+        glassType: { select: { id: true, name: true, photo_url: true } },
       },
     });
   });

@@ -10,6 +10,60 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 ---
 
+# Versionamento — REGRA OBRIGATÓRIA
+
+O projeto segue **SemVer** (`MAJOR.MINOR.PATCH`). A versão é a fonte de verdade do que está em produção e DEVE estar visível ao gerente no header da aplicação.
+
+## Quando incrementar
+
+| Tipo de mudança | Bump | Exemplo |
+|---|---|---|
+| Bug fix sem mudança de API/UX | PATCH (`0.1.0` → `0.1.1`) | Corrigir cálculo `to_produce`, erro de validação |
+| Nova feature, novo endpoint, novo módulo, mudança de UX | MINOR (`0.1.0` → `0.2.0`) | Adicionar sub-tabs no Insumos, novo módulo de Menu |
+| Breaking change em schema, API ou contrato com cliente | MAJOR (`0.x.x` → `1.0.0`) | Renomear endpoint, remover campo do schema, mudança de auth |
+
+## Processo obrigatório a cada alteração
+
+Toda IA que modificar código DEVE, antes de finalizar a tarefa:
+
+1. Atualizar `package.json` → campo `version` (SemVer)
+2. Adicionar entrada no topo de `CHANGELOG.md` no formato abaixo
+3. Mencionar a nova versão na resposta final ao usuário
+
+```markdown
+## [0.2.0] - 2026-MM-DD
+
+### Added
+- Sub-tabs de categoria (Primary/Manipulated/Intermediate/Final) na tela de Insumos
+- Endpoint `GET /api/prep-items?category=`
+
+### Changed
+- `PrepItem` agora tem campo `category: RecipeCategory`
+
+### Fixed
+- Cálculo de `to_produce` ignorando produção do dia anterior
+
+### Migration
+- `20260520_add_category_to_prep_items`
+```
+
+Seções permitidas: `Added`, `Changed`, `Deprecated`, `Removed`, `Fixed`, `Security`, `Migration`.
+
+## Exibição da versão
+
+- TopNav (visão ADMIN/MANAGER): badge `v0.X.Y` ao lado do logo SOP
+- Clicar no badge → modal/dialog com as últimas 5 entradas do CHANGELOG
+- A versão é lida em build-time de `package.json` via `process.env.NEXT_PUBLIC_APP_VERSION` (definida no `next.config.ts`)
+- STAFF (não-gerente): NÃO vê o badge — apenas o logo
+
+## Documentação adicional
+
+- Mudanças que afetam o data model também devem ser refletidas em `docs/02_SPECS.md`
+- Mudanças que afetam features para usuários finais também em `docs/01_PRD.md`
+- Decisões arquiteturais novas → registrar em `docs/ARA.md` como novo ARA-NNN
+
+---
+
 # SOP Mobile — Guia de Continuação para IAs
 
 ## Onde ler antes de começar

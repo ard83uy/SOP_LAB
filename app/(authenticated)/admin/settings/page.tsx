@@ -1,6 +1,6 @@
 "use client";
 
-import { Users, ChevronRight, UserCog, LayoutDashboard, Wrench } from "lucide-react";
+import { Users, ChevronRight, UserCog, LayoutDashboard, Wrench, GlassWater } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -29,6 +29,12 @@ const settingsItems = [
     icon: Wrench,
     label: "Ferramentas de Cozinha",
     description: "Gerencie a lista de ferramentas disponíveis nas fichas técnicas",
+  },
+  {
+    href: "/admin/settings/glass-types",
+    icon: GlassWater,
+    label: "Tipos de Copo",
+    description: "Cadastre copos com foto para fichas técnicas de drinks/bebidas",
   },
 ];
 

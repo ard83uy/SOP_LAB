@@ -41,6 +41,7 @@ model Tenant {
   prepItemRequests PrepItemRequest[]
   recipes        Recipe[]
   kitchenTools   KitchenTool[]
+  glassTypes     GlassType[]
   checklists     Checklist[]
   checklistCompletions ChecklistCompletion[]
 }
@@ -102,9 +103,12 @@ model PrepItem {
   name           String
   unit           String
   target_quantity Float
+  category       RecipeCategory  @default(PRIMARY)
+  recipe_id      String?         @unique @db.Uuid
   created_at     DateTime        @default(now())
 
   tenant         Tenant             @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  recipe         Recipe?            @relation("RecipePromoted", fields: [recipe_id], references: [id], onDelete: SetNull)
   stations       Station[]
   handoverItemCounts HandoverItemCount[]
   productionLogs ProductionLog[]
@@ -213,26 +217,50 @@ enum RecipeCategory {
   FINAL         // Produtos finais
 }
 
+enum RecipeLayout {
+  FOOD   // Layout padrão: ingredientes, passos, ferramentas, dica
+  DRINK  // Layout de bebidas: + tipo de copo
+}
+
 model Recipe {
   id              String              @id @default(uuid()) @db.Uuid
   tenant_id       String              @db.Uuid
   name            String
   description     String?
   category        RecipeCategory
+  layout          RecipeLayout        @default(FOOD)
   base_yield      Float               // Ex: 10 (porções), 2 (kg)
   yield_unit      String              // Ex: "porções", "kg"
   photo_url       String?
+  glass_type_id   String?             @db.Uuid       // Apenas usado quando layout = DRINK
   allowed_profile_ids String[]  @default([])
   required_tools  String[]    @default([])
   chefs_tip       String?
+  decoration      String?              // Apenas usado quando layout = DRINK (texto livre)
   created_at      DateTime            @default(now())
   updated_at      DateTime            @updatedAt
 
   tenant           Tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  glassType        GlassType?          @relation(fields: [glass_type_id], references: [id], onDelete: SetNull)
   ingredients      RecipeIngredient[]
   steps            RecipeStep[]
   comments         RecipeComment[]
   usedAsIngredient RecipeIngredient[]  @relation("IngredientSource")
+  promotedAs       PrepItem?           @relation("RecipePromoted")
+
+  @@unique([tenant_id, name])
+}
+
+model GlassType {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenant_id  String   @db.Uuid
+  name       String
+  photo_url  String?
+  sort_order Int      @default(0)
+  created_at DateTime @default(now())
+
+  tenant  Tenant   @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  recipes Recipe[]
 
   @@unique([tenant_id, name])
 }

@@ -8,6 +8,7 @@ import {
   ArrowLeft, Plus, Trash2, GripVertical, Save,
   ChefHat, MessageSquare, ImageIcon, ListOrdered,
   Minus, PackagePlus, Wrench, Pencil, Check, X,
+  GlassWater, UtensilsCrossed, Sparkles,
 } from "lucide-react";
 import {
   DndContext, closestCenter, PointerSensor, TouchSensor,
@@ -61,20 +62,33 @@ type Comment = {
   user: { name: string };
 };
 
+type RecipeLayout = "FOOD" | "DRINK";
+
+type GlassRef = { id: string; name: string; photo_url: string | null };
+
 type Recipe = {
   id: string;
   name: string;
   description: string | null;
   category: string;
+  layout: RecipeLayout;
   base_yield: number;
   yield_unit: string;
   photo_url: string | null;
+  glass_type_id: string | null;
+  glassType: GlassRef | null;
   allowed_profile_ids: string[];
   required_tools: string[];
   chefs_tip: string | null;
+  decoration: string | null;
   ingredients: Ingredient[];
   steps: Step[];
   comments: Comment[];
+};
+
+const LAYOUT_BADGE: Record<RecipeLayout, { label: string; icon: any; classes: string }> = {
+  FOOD: { label: "Comida", icon: UtensilsCrossed, classes: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300" },
+  DRINK: { label: "Bebida", icon: GlassWater, classes: "bg-cyan-100 text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-300" },
 };
 
 type KitchenTool = {
@@ -319,6 +333,8 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
   const [allowedProfileIds, setAllowedProfileIds] = useState<string[]>([]);
   const [requiredTools, setRequiredTools] = useState<string[]>([]);
   const [chefsTip, setChefsTip] = useState("");
+  const [decoration, setDecoration] = useState("");
+  const [glassTypeId, setGlassTypeId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [customYield, setCustomYield] = useState<string>("");
@@ -344,10 +360,22 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
     setAllowedProfileIds(recipe.allowed_profile_ids);
     setRequiredTools(recipe.required_tools ?? []);
     setChefsTip(recipe.chefs_tip ?? "");
+    setDecoration(recipe.decoration ?? "");
+    setGlassTypeId(recipe.glass_type_id);
     setNameValue(recipe.name);
     setCustomYield(String(recipe.base_yield));
     setInitialized(true);
   }
+
+  const { data: glassTypes = [] } = useQuery<GlassRef[]>({
+    queryKey: ["glass-types"],
+    queryFn: async () => {
+      const res = await fetch("/api/glass-types");
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: recipe?.layout === "DRINK",
+  });
 
   const { data: kitchenTools = [] } = useQuery<KitchenTool[]>({
     queryKey: ["kitchen-tools"],
@@ -374,6 +402,8 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         body: JSON.stringify({
           name: nameValue.trim() || undefined,
           photo_url: photoUrl.trim() || null,
+          glass_type_id: recipe?.layout === "DRINK" ? glassTypeId : null,
+          decoration: recipe?.layout === "DRINK" ? (decoration.trim() || null) : null,
           allowed_profile_ids: allowedProfileIds,
           required_tools: requiredTools,
           chefs_tip: chefsTip.trim() || null,
@@ -555,10 +585,20 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
               </Button>
             </div>
           )}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${CATEGORY_COLORS[recipe.category] ?? ""}`}>
               {CATEGORY_LABELS[recipe.category]}
             </span>
+            {(() => {
+              const info = LAYOUT_BADGE[recipe.layout];
+              const Icon = info.icon;
+              return (
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${info.classes}`}>
+                  <Icon className="w-3 h-3" />
+                  {info.label}
+                </span>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -701,6 +741,27 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         )}
       </section>
 
+      {/* ── Decoração (DRINK only) ──────────────────────────────────────────── */}
+      {recipe.layout === "DRINK" && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-primary" /> Decoração
+          </h2>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Acabamento final do drink: enfeite, aro, raspas, frutas, ervas...
+          </p>
+          <Textarea
+            className="resize-none min-h-[80px] text-base"
+            placeholder="Ex: Rodela de limão siciliano e raminho de hortelã no topo; aro do copo com açúcar mascavo."
+            value={decoration}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
+              setDecoration(e.target.value);
+              setDirty(true);
+            }}
+          />
+        </section>
+      )}
+
       {/* ── Ferramentas Necessárias ──────────────────────────────────────────── */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold flex items-center gap-2">
@@ -760,10 +821,62 @@ export default function RecipeDetailPage({ params }: { params: Promise<{ id: str
         />
       </section>
 
+      {/* ── Glass type (DRINK only) ─────────────────────────────────────────── */}
+      {recipe.layout === "DRINK" && (
+        <section className="space-y-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <GlassWater className="w-5 h-5 text-primary" /> Tipo de Copo
+          </h2>
+          {glassTypes.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-6 text-center space-y-2">
+                <p className="text-muted-foreground text-sm">
+                  Nenhum tipo de copo cadastrado.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => router.push("/admin/settings/glass-types")}>
+                  Cadastrar tipos de copo
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              {glassTypes.map((g) => {
+                const active = glassTypeId === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => { setGlassTypeId(active ? null : g.id); setDirty(true); }}
+                    className={`flex flex-col items-center gap-1 p-2 rounded-lg border transition-all ${
+                      active
+                        ? "border-primary bg-primary/10 ring-2 ring-primary/20"
+                        : "border-border hover:border-primary/50"
+                    }`}
+                  >
+                    {g.photo_url ? (
+                      <div className="w-full aspect-square rounded-lg overflow-hidden bg-muted">
+                        <img src={g.photo_url} alt={g.name} className="w-full h-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-full aspect-square rounded-lg bg-muted/50 flex items-center justify-center">
+                        <GlassWater className="w-6 h-6 text-muted-foreground/50" />
+                      </div>
+                    )}
+                    <span className={`text-xs font-semibold text-center leading-tight line-clamp-2 ${active ? "text-primary" : "text-foreground"}`}>
+                      {g.name}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Photo ───────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold flex items-center gap-2">
-          <ImageIcon className="w-5 h-5 text-primary" /> Foto do Produto
+          <ImageIcon className="w-5 h-5 text-primary" /> {recipe.layout === "DRINK" ? "Foto do Drink" : "Foto do Produto"}
         </h2>
         <Card>
           <CardContent className="p-4 space-y-3">

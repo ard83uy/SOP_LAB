@@ -13,7 +13,10 @@ async function listPrepItemsHandler(req: AppRequest, { params }: { params: { sta
 
   const items = await prisma.prepItem.findMany({
     where: { tenant_id, stations: { some: { id: station_id } } } as any,
-    include: { dayTargets: true } as any,
+    include: {
+      dayTargets: true,
+      recipe: { select: { id: true, name: true, category: true } },
+    } as any,
     orderBy: { name: "asc" },
   });
 

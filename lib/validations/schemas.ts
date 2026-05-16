@@ -5,11 +5,14 @@ export const createStationSchema = z.object({
   icon: z.string().optional(),
 });
 
+export const recipeCategoryEnum = z.enum(["PRIMARY", "MANIPULATED", "INTERMEDIATE", "FINAL"]);
+
 export const createPrepItemSchema = z.object({
   station_id: z.string().uuid(),
   name: z.string().min(2).max(100),
   unit: z.string().min(1).max(20),
   target_quantity: z.number().positive().max(99999),
+  category: recipeCategoryEnum.optional(),
 });
 
 export const updateStationSchema = z.object({
@@ -21,8 +24,19 @@ export const updatePrepItemSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   unit: z.string().min(1).max(20).optional(),
   target_quantity: z.number().positive().max(99999).optional(),
-}).refine((data) => data.name !== undefined || data.unit !== undefined || data.target_quantity !== undefined, {
-  message: "Pelo menos 1 campo é obrigatório",
+  category: recipeCategoryEnum.optional(),
+}).refine(
+  (data) =>
+    data.name !== undefined ||
+    data.unit !== undefined ||
+    data.target_quantity !== undefined ||
+    data.category !== undefined,
+  { message: "Pelo menos 1 campo é obrigatório" }
+);
+
+export const promoteRecipeSchema = z.object({
+  target_quantity: z.number().positive().max(99999),
+  station_ids: z.array(z.string().uuid()).optional(),
 });
 
 export const submitHandoverSchema = z.object({
@@ -65,16 +79,21 @@ export const reviewPrepItemRequestSchema = z.object({
 
 // ── Fichas Técnicas (Recipes) ────────────────────────────────────────────────
 
+export const recipeLayoutEnum = z.enum(["FOOD", "DRINK"]);
+
 export const createRecipeSchema = z.object({
   name: z.string().min(2).max(100),
   description: z.string().max(1000).optional(),
   category: z.enum(["PRIMARY", "MANIPULATED", "INTERMEDIATE", "FINAL"]),
+  layout: recipeLayoutEnum.optional(),
   base_yield: z.number().positive().max(99999),
   yield_unit: z.string().min(1).max(20),
   photo_url: z.string().max(2048).optional(),
+  glass_type_id: z.string().uuid().nullable().optional(),
   allowed_profile_ids: z.array(z.string().uuid()).default([]),
   required_tools: z.array(z.string().min(1).max(100)).default([]),
   chefs_tip: z.string().max(2000).optional(),
+  decoration: z.string().max(2000).optional(),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),
@@ -92,12 +111,15 @@ export const updateRecipeSchema = z.object({
   name: z.string().min(2).max(100).optional(),
   description: z.string().max(1000).optional(),
   category: z.enum(["PRIMARY", "MANIPULATED", "INTERMEDIATE", "FINAL"]).optional(),
+  layout: recipeLayoutEnum.optional(),
   base_yield: z.number().positive().max(99999).optional(),
   yield_unit: z.string().min(1).max(20).optional(),
   photo_url: z.string().max(2048).nullable().optional(),
+  glass_type_id: z.string().uuid().nullable().optional(),
   allowed_profile_ids: z.array(z.string().uuid()).optional(),
   required_tools: z.array(z.string().min(1).max(100)).optional(),
   chefs_tip: z.string().max(2000).nullable().optional(),
+  decoration: z.string().max(2000).nullable().optional(),
   ingredients: z.array(z.object({
     prep_item_id: z.string().uuid().optional(),
     source_recipe_id: z.string().uuid().optional(),
@@ -115,6 +137,20 @@ export const updateRecipeSchema = z.object({
 
 export const createKitchenToolSchema = z.object({
   name: z.string().min(1).max(100),
+  sort_order: z.number().int().min(0).optional(),
+});
+
+// ── Glass Types (Tipos de Copo) ──────────────────────────────────────────────
+
+export const createGlassTypeSchema = z.object({
+  name: z.string().min(1).max(100),
+  photo_url: z.string().max(2048).nullable().optional(),
+  sort_order: z.number().int().min(0).optional(),
+});
+
+export const updateGlassTypeSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  photo_url: z.string().max(2048).nullable().optional(),
   sort_order: z.number().int().min(0).optional(),
 });
 
